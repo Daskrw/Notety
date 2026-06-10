@@ -13,7 +13,7 @@ export function CreateTemplateModal() {
   const [defaultTitle, setDefaultTitle] = useState('');
   const [categoryId, setCategoryId] = useState('uncategorized');
   const [content, setContent] = useState('');
-  const [highlights, setHighlights] = useState<{name: string, content: string}[]>([]);
+  const [highlights, setHighlights] = useState<{name: string, content?: string}[]>([]);
 
   const addHighlight = () => setHighlights([...highlights, { name: '', content: '' }]);
   const updateHighlight = (index: number, field: 'name' | 'content', val: string) => {

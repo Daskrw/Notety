@@ -18,7 +18,7 @@ export function TemplateModal() {
   const [defaultTitle, setDefaultTitle] = useState('');
   const [categoryId, setCategoryId] = useState('uncategorized');
   const [content, setContent] = useState('');
-  const [highlights, setHighlights] = useState<{name: string, content: string}[]>([]);
+  const [highlights, setHighlights] = useState<{name: string, content?: string}[]>([]);
 
   useEffect(() => {
     if (existingTemplate) {
