@@ -35,8 +35,8 @@ interface AppState {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   // Template Modals
-  isTemplateModalOpen: boolean;
-  setIsTemplateModalOpen: (isOpen: boolean) => void;
+  isCreateTemplateModalOpen: boolean;
+  setIsCreateTemplateModalOpen: (isOpen: boolean) => void;
   editingTemplateId: string | null;
   setEditingTemplateId: (id: string | null) => void;
   isUseTemplateModalOpen: boolean;
@@ -66,8 +66,8 @@ export const useAppStore = create<AppState>((set) => ({
   setIsHighlightModalOpen: (isOpen) => set({ isHighlightModalOpen: isOpen }),
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
-  isTemplateModalOpen: false,
-  setIsTemplateModalOpen: (isOpen) => set({ isTemplateModalOpen: isOpen }),
+  isCreateTemplateModalOpen: false,
+  setIsCreateTemplateModalOpen: (isOpen) => set({ isCreateTemplateModalOpen: isOpen }),
   editingTemplateId: null,
   setEditingTemplateId: (id) => set({ editingTemplateId: id }),
   isUseTemplateModalOpen: false,
