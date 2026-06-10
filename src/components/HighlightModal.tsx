@@ -6,8 +6,6 @@ import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useState, useEffect } from 'react';
-import { useAutoSave } from 'use-debounce'; // Wait, I'll just write custom save logic or use onBlur
-
 export function HighlightModal() {
   const { isHighlightModalOpen, setIsHighlightModalOpen, activeHighlightId, setActiveHighlightId } = useAppStore();
   const [editContent, setEditContent] = useState('');
