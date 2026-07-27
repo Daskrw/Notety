@@ -14,9 +14,11 @@ const prompt = Prompt({
 });
 
 export const metadata: Metadata = {
-  title: "Quiet Notes",
+  title: "NotetyNew",
   description: "Minimalist note-taking application",
 };
+
+import { AuthProvider } from "@/components/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -29,7 +31,9 @@ export default function RootLayout({
       className={`${inter.variable} ${prompt.variable} antialiased h-full`}
     >
       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900 selection:bg-stone-200 font-sans">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

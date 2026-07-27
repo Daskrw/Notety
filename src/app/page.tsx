@@ -5,10 +5,10 @@ import { NoteEditor } from '@/components/NoteEditor';
 import { Login } from '@/components/Login';
 import { RightPanel } from '@/components/RightPanel';
 import { HighlightModal } from '@/components/HighlightModal';
-import { UseTemplateModal } from '@/components/UseTemplateModal';
-import { TemplateModal } from '@/components/TemplateModal';
+import { SettingsModal } from '@/components/SettingsModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EditCategoryModal } from '@/components/EditCategoryModal';
+import { ProfilePanel } from '@/components/ProfilePanel';
 
 export default function Home() {
   const { isAuthenticated } = useAuthStore();
@@ -20,11 +20,11 @@ export default function Home() {
   return (
     <main className="flex h-screen bg-stone-50 font-sans overflow-hidden">
       <Sidebar />
+      <ProfilePanel />
       <NoteEditor />
       <RightPanel />
       <HighlightModal />
-      <TemplateModal />
-      <UseTemplateModal />
+      <SettingsModal />
       <ConfirmModal />
       <EditCategoryModal />
     </main>

@@ -1,43 +1,77 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { useAppStore } from '@/store/useStore';
+import { useAppStore, useAuthStore } from '@/store/useStore';
+import { createHighlight, deleteHighlight } from '@/lib/data';
 import { PanelRightClose, PanelRightOpen, Plus, FileText, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 export function RightPanel() {
   const { isRightPanelOpen, toggleRightPanel, selectedNoteId, setIsHighlightModalOpen, setActiveHighlightId } = useAppStore();
+  const { user } = useAuthStore();
   const [isCreating, setIsCreating] = useState(false);
   const [newHighlightName, setNewHighlightName] = useState('');
+  const panelRef = useRef<HTMLElement>(null);
+
+  // Pointer-based drop listener for dropping blocks into the Highlights panel
+  const selectedNoteIdRef = useRef(selectedNoteId);
+  selectedNoteIdRef.current = selectedNoteId;
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  useEffect(() => {
+    const unregister = registerDropListener(async (payload: DragBlockPayload, x: number, y: number) => {
+      const noteId = selectedNoteIdRef.current;
+      const u = userRef.current;
+      if (!noteId || !u || !panelRef.current) return;
+
+      const rect = panelRef.current.getBoundingClientRect();
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
+
+      const name = payload.type === 'password' ? 'Dropped Password' : 'Dropped Ping';
+      let content = '';
+      if (payload.type === 'password') {
+        content = `**Password Box**\n\nPassword: \`${payload.value || 'N/A'}\``;
+      } else if (payload.type === 'ping') {
+        const val = String(payload.value || '');
+        let ipStr = 'Awaiting 5 digits...';
+        if (val.length >= 5) {
+          const clean = val.replace(/\D/g, '').substring(0, 5);
+          if (clean.length === 5) {
+            const a = clean[0] === '0' ? '7' : clean[0];
+            ipStr = `11${a}.1${clean[1]}${clean[2]}.1${clean[3]}${clean[4]}.xxx`;
+          }
+        }
+        content = `**Ping Box**\n\nInput: ${val}\nSignal: \`${ipStr}\``;
+      }
+
+      await createHighlight(u.id, noteId, name, content);
+    });
+    return unregister;
+  }, []);
 
   const highlights = useLiveQuery(
     async () => {
       if (!selectedNoteId) return [];
-      const items = await db.highlights.where('noteId').equals(selectedNoteId).toArray();
-      return items.sort((a, b) => b.createdAt - a.createdAt);
+      const items = await db.highlights.where('note_id').equals(selectedNoteId).toArray();
+      return items.sort((a, b) => b.created_at - a.created_at);
     },
     [selectedNoteId]
   );
 
-  const createHighlight = async () => {
-    if (!selectedNoteId || !newHighlightName.trim()) return;
-    
-    await db.highlights.add({
-      id: crypto.randomUUID(),
-      noteId: selectedNoteId,
-      name: newHighlightName.trim(),
-      content: '', // Start empty, let user edit in modal
-      createdAt: Date.now(),
-    });
-    
+  const handleCreateHighlight = async () => {
+    if (!selectedNoteId || !newHighlightName.trim() || !user) return;
+    await createHighlight(user.id, selectedNoteId, newHighlightName.trim());
     setNewHighlightName('');
     setIsCreating(false);
   };
 
-  const deleteHighlight = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteHighlight = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await db.highlights.delete(id);
+    if (!user) return;
+    await deleteHighlight(id, user.id);
   };
 
   const openHighlight = (id: string) => {
@@ -45,16 +79,16 @@ export function RightPanel() {
     setIsHighlightModalOpen(true);
   };
 
+
   if (!isRightPanelOpen) {
-    return (
-      <button onClick={toggleRightPanel} className="p-4 fixed top-0 right-0 hover:bg-stone-100 rounded-bl-lg transition-colors z-40 group">
-        <PanelRightOpen className="w-5 h-5 text-stone-400 group-hover:text-stone-700" />
-      </button>
-    );
+    return null;
   }
 
   return (
-    <aside className="w-72 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] shrink-0">
+    <aside 
+      ref={panelRef}
+      className="w-72 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] shrink-0"
+    >
       <div className="h-16 px-5 flex items-center justify-between border-b border-stone-100">
         <span className="text-xs font-heading font-semibold tracking-widest text-stone-500 uppercase">Highlights</span>
         <button onClick={toggleRightPanel} className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-md transition-colors">
@@ -80,13 +114,13 @@ export function RightPanel() {
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="text-sm font-medium text-stone-800 leading-snug">{hl.name}</h4>
                   <button 
-                    onClick={(e) => deleteHighlight(e, hl.id)}
+                    onClick={(e) => handleDeleteHighlight(e, hl.id)}
                     className="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-500 transition-opacity p-1 -mr-2 -mt-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-xs text-stone-400 mt-2 font-medium">{format(hl.createdAt, 'MMM d, yyyy')}</p>
+                <p className="text-xs text-stone-400 mt-2 font-medium">{format(hl.created_at, 'MMM d, yyyy')}</p>
               </div>
             ))}
             
@@ -107,12 +141,12 @@ export function RightPanel() {
                   placeholder="Name your highlight..."
                   className="w-full text-sm px-3 py-2.5 bg-white border border-stone-200 rounded-lg outline-none focus:border-stone-400 focus:shadow-sm transition-all"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') createHighlight();
+                    if (e.key === 'Enter') handleCreateHighlight();
                     if (e.key === 'Escape') setIsCreating(false);
                   }}
                 />
                 <div className="flex gap-2">
-                  <button onClick={createHighlight} className="flex-1 bg-stone-900 text-white text-xs py-2.5 rounded-lg font-medium hover:bg-stone-800 transition-colors">Save</button>
+                  <button onClick={handleCreateHighlight} className="flex-1 bg-stone-900 text-white text-xs py-2.5 rounded-lg font-medium hover:bg-stone-800 transition-colors">Save</button>
                   <button onClick={() => setIsCreating(false)} className="flex-1 bg-white border border-stone-200 text-stone-600 text-xs py-2.5 rounded-lg font-medium hover:bg-stone-50 transition-colors">Cancel</button>
                 </div>
               </div>

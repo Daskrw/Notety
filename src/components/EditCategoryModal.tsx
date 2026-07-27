@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { useAppStore } from '@/store/useStore';
+import { useAppStore, useAuthStore } from '@/store/useStore';
+import { updateCategory } from '@/lib/data';
 import { X } from 'lucide-react';
 
 export function EditCategoryModal() {
   const { isEditCategoryModalOpen, setIsEditCategoryModalOpen, editingCategoryId, setEditingCategoryId } = useAppStore();
+  const { user } = useAuthStore();
   
   const category = useLiveQuery(
     () => editingCategoryId ? db.categories.get(editingCategoryId) : undefined,
@@ -30,8 +32,8 @@ export function EditCategoryModal() {
   };
 
   const saveCategory = async () => {
-    if (!category || !name.trim()) return;
-    await db.categories.update(category.id, { name: name.trim() });
+    if (!category || !name.trim() || !user) return;
+    await updateCategory(category.id, user.id, name.trim());
     closeModal();
   };
 

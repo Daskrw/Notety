@@ -1,13 +1,15 @@
 "use client";
-import { useAppStore } from '@/store/useStore';
+import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { updateHighlight } from '@/lib/data';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useState, useEffect } from 'react';
 export function HighlightModal() {
   const { isHighlightModalOpen, setIsHighlightModalOpen, activeHighlightId, setActiveHighlightId } = useAppStore();
+  const { user } = useAuthStore();
   const [editContent, setEditContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
@@ -29,8 +31,8 @@ export function HighlightModal() {
   };
 
   const saveContent = async () => {
-    if (highlight && editContent !== highlight.content) {
-      await db.highlights.update(highlight.id, { content: editContent });
+    if (highlight && user && editContent !== highlight.content) {
+      await updateHighlight(highlight.id, user.id, editContent);
     }
     setIsEditing(false);
   };

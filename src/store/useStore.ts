@@ -1,17 +1,17 @@
 import { create } from 'zustand';
+import type { User } from '@supabase/supabase-js';
+import type { UserProfile } from '@/lib/db';
 
 interface AuthState {
   isAuthenticated: boolean;
-  username: string | null;
-  login: (username: string) => void;
-  logout: () => void;
+  user: User | null;
+  setUser: (user: User | null) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
-  username: null,
-  login: (username) => set({ isAuthenticated: true, username }),
-  logout: () => set({ isAuthenticated: false, username: null }),
+  user: null,
+  setUser: (user) => set({ isAuthenticated: !!user, user }),
 }));
 
 export interface ConfirmConfig {
@@ -40,18 +40,9 @@ interface AppState {
   isHighlightModalOpen: boolean;
   setIsHighlightModalOpen: (isOpen: boolean) => void;
 
-  // Template Modals
-  isTemplateModalOpen: boolean;
-  setIsTemplateModalOpen: (isOpen: boolean) => void;
-  isCreateTemplateModalOpen: boolean;
-  setIsCreateTemplateModalOpen: (isOpen: boolean) => void;
-  isUseTemplateModalOpen: boolean;
-  setIsUseTemplateModalOpen: (isOpen: boolean) => void;
-  
-  editingTemplateId: string | null;
-  setEditingTemplateId: (id: string | null) => void;
-  activeTemplateId: string | null;
-  setActiveTemplateId: (id: string | null) => void;
+  // Settings
+  isSettingsModalOpen: boolean;
+  setIsSettingsModalOpen: (isOpen: boolean) => void;
 
   // Category Modals
   isEditCategoryModalOpen: boolean;
@@ -62,6 +53,12 @@ interface AppState {
   // Confirm Modal
   confirmConfig: ConfirmConfig;
   setConfirmConfig: (config: Partial<ConfirmConfig>) => void;
+
+  // Profile
+  isProfilePanelOpen: boolean;
+  setIsProfilePanelOpen: (isOpen: boolean) => void;
+  userProfile: UserProfile | null;
+  setUserProfile: (profile: UserProfile | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -83,18 +80,9 @@ export const useAppStore = create<AppState>((set) => ({
   isHighlightModalOpen: false,
   setIsHighlightModalOpen: (isOpen) => set({ isHighlightModalOpen: isOpen }),
 
-  // Template Modals
-  isTemplateModalOpen: false,
-  setIsTemplateModalOpen: (isOpen) => set({ isTemplateModalOpen: isOpen }),
-  isCreateTemplateModalOpen: false,
-  setIsCreateTemplateModalOpen: (isOpen) => set({ isCreateTemplateModalOpen: isOpen }),
-  isUseTemplateModalOpen: false,
-  setIsUseTemplateModalOpen: (isOpen) => set({ isUseTemplateModalOpen: isOpen }),
-  
-  editingTemplateId: null,
-  setEditingTemplateId: (id) => set({ editingTemplateId: id }),
-  activeTemplateId: null,
-  setActiveTemplateId: (id) => set({ activeTemplateId: id }),
+  // Settings
+  isSettingsModalOpen: false,
+  setIsSettingsModalOpen: (isOpen) => set({ isSettingsModalOpen: isOpen }),
 
   // Category Modals
   isEditCategoryModalOpen: false,
@@ -105,4 +93,10 @@ export const useAppStore = create<AppState>((set) => ({
   // Confirm Modal
   confirmConfig: { isOpen: false, title: '', message: '', onConfirm: () => {} },
   setConfirmConfig: (config) => set((state) => ({ confirmConfig: { ...state.confirmConfig, ...config } })),
+
+  // Profile
+  isProfilePanelOpen: false,
+  setIsProfilePanelOpen: (isOpen) => set({ isProfilePanelOpen: isOpen }),
+  userProfile: null,
+  setUserProfile: (profile) => set({ userProfile: profile }),
 }));
