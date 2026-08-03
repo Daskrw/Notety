@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
@@ -7,9 +7,7 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
 import { Star, Trash2, PanelRightOpen } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
-import { parseBlocks, serializeBlocks, EditorBlock } from '@/lib/blocks';
-import { PasswordBlockView } from './PasswordBlockView';
-import { PingBlockView } from './PingBlockView';
+import { parseNoteContent, serializeNoteContent, EditorBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
@@ -18,7 +16,6 @@ export function NoteEditor() {
   const { user } = useAuthStore();
   const [localNote, setLocalNote] = useState<Note | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const blockRefsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const dbNote = useLiveQuery(
     () => selectedNoteId ? db.notes.get(selectedNoteId) : undefined,
@@ -35,16 +32,16 @@ export function NoteEditor() {
 
   useAutoSave(localNote, 1500);
 
-  // Pointer-based drop: register a global listener that fires when a block is dropped
   const localNoteRef = useRef(localNote);
   localNoteRef.current = localNote;
 
+  // Pointer-based drop: register a global listener that fires when a block is dropped
   useEffect(() => {
     const unregister = registerDropListener((payload: DragBlockPayload, x: number, y: number) => {
       const current = localNoteRef.current;
       if (!current) return;
 
-      const currentBlocks = parseBlocks(current.content);
+      const noteContent = parseNoteContent(current.content);
 
       // Give the block a fresh UUID when coming from the template
       const droppedBlock: EditorBlock = {
@@ -55,52 +52,26 @@ export function NoteEditor() {
         value: payload.value,
       };
 
-      // Find which block container the drop point falls inside
-      let targetIndex = currentBlocks.length - 1;
-      if (blockRefsRef.current) {
-        for (const [id, el] of blockRefsRef.current.entries()) {
-          if (!el) continue;
-          const rect = el.getBoundingClientRect();
-          if (y >= rect.top && y <= rect.bottom) {
-            const idx = currentBlocks.findIndex(b => b.id === id);
-            if (idx !== -1) { targetIndex = idx; break; }
-          }
-        }
-      }
-
-      const newBlocks = [...currentBlocks];
+      const newBlocks = [...noteContent.blocks];
       const existingIndex = newBlocks.findIndex(b => b.id === droppedBlock.id);
-      let actualTargetIndex = targetIndex;
 
       if (existingIndex !== -1) {
-        newBlocks.splice(existingIndex, 1);
-        if (existingIndex < targetIndex) actualTargetIndex -= 1;
-      }
-
-      if (actualTargetIndex < 0) actualTargetIndex = 0;
-      const targetBlock = newBlocks[actualTargetIndex];
-
-      if (targetBlock && targetBlock.type === 'text') {
-        if (targetBlock.value === '') {
-          newBlocks[actualTargetIndex] = droppedBlock;
-          newBlocks.splice(actualTargetIndex + 1, 0, { id: crypto.randomUUID(), type: 'text', value: '' });
-        } else {
-          newBlocks[actualTargetIndex] = { ...targetBlock, value: targetBlock.value };
-          newBlocks.splice(
-            actualTargetIndex + 1,
-            0,
-            droppedBlock,
-            { id: crypto.randomUUID(), type: 'text', value: '' }
-          );
-        }
+        newBlocks[existingIndex] = droppedBlock;
       } else {
-        newBlocks.splice(actualTargetIndex + 1, 0, droppedBlock, { id: crypto.randomUUID(), type: 'text', value: '' });
+        newBlocks.push(droppedBlock);
       }
 
-      setLocalNote({ ...current, content: serializeBlocks(newBlocks) });
+      setLocalNote({
+        ...current,
+        content: serializeNoteContent(noteContent.text, newBlocks)
+      });
+      // Automatically open side panel so user sees the block was added
+      if (!isRightPanelOpen) {
+        toggleRightPanel();
+      }
     });
     return unregister;
-  }, []);
+  }, [isRightPanelOpen, toggleRightPanel]);
 
   const toggleFeatured = async () => {
     if (!localNote || !user) return;
@@ -123,97 +94,10 @@ export function NoteEditor() {
     setSelectedNoteId(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, blockIndex: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const triggerKey = userProfile?.shortcut_trigger_key || 'Tab';
     const prefix = userProfile?.shortcut_prefix ?? '!';
     
-    if (e.key === 'Backspace') {
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      
-      if (start === 0 && end === 0) {
-        const blocks = parseBlocks(localNote!.content);
-        const block = blocks[blockIndex];
-        
-        if (blockIndex > 0) {
-          const prevBlock = blocks[blockIndex - 1];
-          if (prevBlock.type === 'text') {
-            e.preventDefault();
-            const newBlocks = [...blocks];
-            const prevTextLength = prevBlock.value.length;
-            newBlocks[blockIndex - 1] = { ...prevBlock, value: prevBlock.value + block.value };
-            newBlocks.splice(blockIndex, 1);
-            setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
-            
-            setTimeout(() => {
-              const prevTextarea = document.getElementById(`block-${prevBlock.id}`) as HTMLTextAreaElement;
-              if (prevTextarea) {
-                prevTextarea.focus();
-                prevTextarea.setSelectionRange(prevTextLength, prevTextLength);
-              }
-            }, 0);
-            return;
-          } else if (block.value === '') {
-            e.preventDefault();
-            const newBlocks = [...blocks];
-            newBlocks.splice(blockIndex, 1);
-            setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
-            return;
-          }
-        } else if (blockIndex === 0 && block.value === '' && blocks.length > 1) {
-          e.preventDefault();
-          const newBlocks = [...blocks];
-          newBlocks.splice(blockIndex, 1);
-          setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
-          
-          setTimeout(() => {
-            const nextBlock = newBlocks[0];
-            if (nextBlock.type === 'text') {
-              const nextTextarea = document.getElementById(`block-${nextBlock.id}`) as HTMLTextAreaElement;
-              if (nextTextarea) {
-                nextTextarea.focus();
-                nextTextarea.setSelectionRange(0, 0);
-              }
-            }
-          }, 0);
-          return;
-        }
-      }
-    }
-
-    if (e.key === 'Delete') {
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      
-      const blocks = parseBlocks(localNote!.content);
-      const block = blocks[blockIndex];
-      
-      if (start === block.value.length && end === block.value.length) {
-        if (blockIndex < blocks.length - 1) {
-          const nextBlock = blocks[blockIndex + 1];
-          if (nextBlock.type === 'text') {
-            e.preventDefault();
-            const newBlocks = [...blocks];
-            const currentTextLength = block.value.length;
-            newBlocks[blockIndex] = { ...block, value: block.value + nextBlock.value };
-            newBlocks.splice(blockIndex + 1, 1);
-            setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
-            
-            setTimeout(() => {
-              const currentTextarea = document.getElementById(`block-${block.id}`) as HTMLTextAreaElement;
-              if (currentTextarea) {
-                currentTextarea.focus();
-                currentTextarea.setSelectionRange(currentTextLength, currentTextLength);
-              }
-            }, 0);
-            return;
-          }
-        }
-      }
-    }
-
     if (e.key === triggerKey) {
       const target = e.currentTarget;
       const start = target.selectionStart;
@@ -222,11 +106,8 @@ export function NoteEditor() {
       // If there's a selection, default behavior
       if (start !== end) return;
 
-      const blocks = parseBlocks(localNote!.content);
-      const block = blocks[blockIndex];
-      if (block.type !== 'text') return;
-
-      const text = block.value;
+      const noteContent = parseNoteContent(localNote!.content);
+      const text = noteContent.text;
       const textBeforeCursor = text.substring(0, start);
       
       const words = textBeforeCursor.split(/\s+/);
@@ -248,41 +129,21 @@ export function NoteEditor() {
         
         if (snippet) {
           e.preventDefault();
-          const contentBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - lastWord.length);
-          const prefixIncluded = prefix === '' ? '' : (lastPrefixIndex !== -1 ? lastWord.substring(0, lastPrefixIndex) : '');
+          const prefixIncluded = prefix + potentialShortcut;
+          const contentBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - prefixIncluded.length);
+          const textAfterCursor = text.substring(start);
+          const newText = contentBeforeWord + snippet.content + textAfterCursor;
           
-          const newText = contentBeforeWord + prefixIncluded + snippet.content + text.substring(start);
-          
-          const newBlocks = [...blocks];
-          newBlocks[blockIndex] = { ...block, value: newText };
-          setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
+          setLocalNote({ ...localNote!, content: serializeNoteContent(newText, noteContent.blocks) });
           
           setTimeout(() => {
-            const newCursorPos = contentBeforeWord.length + prefixIncluded.length + snippet.content.length;
+            const newCursorPos = contentBeforeWord.length + snippet.content.length;
             target.setSelectionRange(newCursorPos, newCursorPos);
           }, 0);
         }
       }
     }
   };
-
-  const blocks = localNote ? parseBlocks(localNote.content) : [];
-
-  const updateBlock = (index: number, val: string) => {
-    const newBlocks = [...blocks];
-    newBlocks[index] = { ...newBlocks[index], value: val };
-    setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
-  };
-
-  const removeBlock = (index: number) => {
-    const newBlocks = [...blocks];
-    newBlocks.splice(index, 1);
-    if (newBlocks.length === 0) {
-      newBlocks.push({ id: crypto.randomUUID(), type: 'text', value: '' });
-    }
-    setLocalNote({ ...localNote!, content: serializeBlocks(newBlocks) });
-  };
-
 
   if (!selectedNoteId || !localNote) {
     return (
@@ -291,6 +152,8 @@ export function NoteEditor() {
       </div>
     );
   }
+
+  const noteContent = parseNoteContent(localNote.content);
 
   return (
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-white">
@@ -350,42 +213,17 @@ export function NoteEditor() {
           className="w-full text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-8"
         />
 
-        <div className="flex-1 min-h-[500px] flex flex-col gap-1 pb-32">
-          {blocks.map((block, index) => (
-            <div 
-              key={block.id}
-              ref={(el) => {
-                if (el) blockRefsRef.current.set(block.id, el);
-                else blockRefsRef.current.delete(block.id);
-              }}
-            >
-              {block.type === 'text' && (
-                <TextareaAutosize
-                  id={`block-${block.id}`}
-                  value={block.value}
-                  onChange={(e) => updateBlock(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, index)}
-                  placeholder={blocks.length === 1 ? "Start writing..." : ""}
-                  className="w-full resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
-                  minRows={1}
-                />
-              )}
-              {block.type === 'password' && (
-                <PasswordBlockView 
-                  block={block} 
-                  onChange={(val) => updateBlock(index, val)} 
-                  onRemove={() => removeBlock(index)}
-                />
-              )}
-              {block.type === 'ping' && (
-                <PingBlockView 
-                  block={block} 
-                  onChange={(val) => updateBlock(index, val)} 
-                  onRemove={() => removeBlock(index)}
-                />
-              )}
-            </div>
-          ))}
+        <div className="flex-1 min-h-[500px] flex flex-col pb-32">
+          <TextareaAutosize
+            value={noteContent.text}
+            onChange={(e) => {
+              setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Start writing..."
+            className="w-full resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
+            minRows={15}
+          />
         </div>
       </div>
       

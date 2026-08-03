@@ -22,21 +22,44 @@ export interface PingBlock extends BaseBlock {
 
 export type EditorBlock = TextBlock | PasswordBlock | PingBlock;
 
-export function parseBlocks(content: string): EditorBlock[] {
-  if (!content) return [{ id: crypto.randomUUID(), type: 'text', value: '' }];
+export interface NoteContent {
+  text: string;
+  blocks: EditorBlock[];
+}
+
+export function parseNoteContent(content: string): NoteContent {
+  if (!content) return { text: '', blocks: [] };
   try {
     const parsed = JSON.parse(content);
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].type) {
-      return parsed;
+    if (parsed && typeof parsed === 'object') {
+      if ('text' in parsed || 'blocks' in parsed) {
+        return {
+          text: parsed.text || '',
+          blocks: Array.isArray(parsed.blocks) ? parsed.blocks : []
+        };
+      }
+      // If it's a legacy JSON block array
+      if (Array.isArray(parsed)) {
+        const textBlocks = parsed.filter(b => b.type === 'text');
+        const text = textBlocks.map(b => b.value).join('\n');
+        const otherBlocks = parsed.filter(b => b.type !== 'text');
+        return { text, blocks: otherBlocks };
+      }
     }
   } catch (e) {
     // Legacy plain text note
   }
-  return [{ id: crypto.randomUUID(), type: 'text', value: content }];
+  return { text: content, blocks: [] };
+}
+
+export function serializeNoteContent(text: string, blocks: EditorBlock[]): string {
+  return JSON.stringify({ text, blocks });
+}
+
+export function parseBlocks(content: string): EditorBlock[] {
+  return parseNoteContent(content).blocks;
 }
 
 export function serializeBlocks(blocks: EditorBlock[]): string {
-  // Keeping it as JSON array is safer so we don't accidentally parse user text that looks like JSON.
-  // Wait, if it's a JSON array, when the user sees a legacy plain text note and saves it, it becomes JSON.
-  return JSON.stringify(blocks);
+  return JSON.stringify({ text: '', blocks });
 }
