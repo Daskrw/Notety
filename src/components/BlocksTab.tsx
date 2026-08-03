@@ -107,7 +107,6 @@ export function BlocksTab() {
       <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider mr-4">Blocks</span>
       <PingBlockDraggable />
       <JobBlockDraggable />
-      <PhotoUploadButton />
     </div>
   );
 }
