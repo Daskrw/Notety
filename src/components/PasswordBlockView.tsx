@@ -33,7 +33,7 @@ export function PasswordBlockView({ block, onChange, onRemove }: Props) {
   }, []);
 
   return (
-    <div className="group relative flex items-center bg-stone-100 border border-stone-200 rounded-lg overflow-hidden my-2 max-w-sm transition-all hover:border-stone-300">
+    <div className="group relative flex items-center bg-stone-100 border border-stone-200 rounded-lg overflow-hidden my-1 w-full transition-all hover:border-stone-300">
       <div 
         className="px-2 py-3 bg-stone-200/50 cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-600 transition-colors select-none"
         onMouseDown={onMouseDown}

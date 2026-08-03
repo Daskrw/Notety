@@ -131,7 +131,7 @@ export function RightPanel() {
   return (
     <aside 
       ref={panelRef}
-      className="w-80 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] shrink-0"
+      className="w-96 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] shrink-0"
     >
       {/* Header */}
       <div className="h-16 px-5 flex items-center justify-between border-b border-stone-100 flex-shrink-0">
