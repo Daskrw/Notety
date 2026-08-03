@@ -5,12 +5,11 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu, Ban } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { ImageBlockView } from './ImageBlockView';
-import { TextHighlightToolbar, PRESET_COLORS } from './TextHighlightToolbar';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 export function NoteEditor() {
@@ -18,7 +17,7 @@ export function NoteEditor() {
   const { user } = useAuthStore();
   const [localNote, setLocalNote] = useState<Note | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const editorContentRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const dbNote = useLiveQuery(
     () => selectedNoteId ? db.notes.get(selectedNoteId) : undefined,
@@ -100,14 +99,14 @@ export function NoteEditor() {
     setSelectedNoteId(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const triggerKey = userProfile?.shortcut_trigger_key || 'Tab';
     const prefix = userProfile?.shortcut_prefix ?? '!';
     
     if (e.key === triggerKey) {
-      const target = e.currentTarget as any;
-      const start = target.selectionStart || 0;
-      const end = target.selectionEnd || 0;
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
       
       // If there's a selection, default behavior
       if (start !== end) return;
@@ -200,69 +199,10 @@ export function NoteEditor() {
     }
   };
 
-  const [selectionToolbarPos, setSelectionToolbarPos] = useState<{ top: number; left: number } | null>(null);
-
-  const checkSelection = () => {
-    if (typeof window === 'undefined') return;
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-      setSelectionToolbarPos(null);
-      return;
-    }
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      setSelectionToolbarPos({
-        top: rect.top - 40,
-        left: rect.left + rect.width / 2,
-      });
-    }
-  };
-
-  const applyHighlightColor = (color: string) => {
-    if (typeof window === 'undefined' || !localNote) return;
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
-
-    try {
-      const range = sel.getRangeAt(0);
-      const span = document.createElement('mark');
-      span.style.backgroundColor = color;
-      span.style.color = 'inherit';
-      span.style.padding = '2px 4px';
-      span.style.borderRadius = '4px';
-      
-      const contents = range.extractContents();
-      span.appendChild(contents);
-      range.insertNode(span);
-      sel.removeAllRanges();
-
-      if (editorContentRef.current) {
-        const html = editorContentRef.current.innerHTML;
-        const noteContent = parseNoteContent(localNote.content);
-        setLocalNote({ ...localNote, content: serializeNoteContent(html, noteContent.blocks) });
-      }
-    } catch (e) {
-      document.execCommand('hiliteColor', false, color);
-    }
-    setSelectionToolbarPos(null);
-  };
-
-  const removeHighlightColor = () => {
-    if (typeof window === 'undefined' || !localNote) return;
-    document.execCommand('removeFormat', false);
-    if (editorContentRef.current) {
-      const html = editorContentRef.current.innerHTML;
-      const noteContent = parseNoteContent(localNote.content);
-      setLocalNote({ ...localNote, content: serializeNoteContent(html, noteContent.blocks) });
-    }
-    setSelectionToolbarPos(null);
-  };
-
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target !== editorContentRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
-      if (editorContentRef.current) {
-        editorContentRef.current.focus();
+    if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
       }
     }
   };
@@ -303,11 +243,7 @@ export function NoteEditor() {
           </select>
         </div>
 
-        <div className="flex items-center space-x-3 text-stone-400">
-          <TextHighlightToolbar
-            onSelectColor={(color) => applyHighlightColor(color)}
-            onClearHighlight={() => removeHighlightColor()}
-          />
+        <div className="flex items-center space-x-4 text-stone-400">
           <button
             onClick={toggleFeatured}
             title="Feature this note"
@@ -350,50 +286,18 @@ export function NoteEditor() {
         />
 
         <div className="flex-1 min-h-[500px] flex flex-col pb-32">
-          <div
-            ref={editorContentRef}
-            contentEditable
-            suppressContentEditableWarning
-            dangerouslySetInnerHTML={{ __html: noteContent.text }}
-            onInput={(e) => {
-              const html = e.currentTarget.innerHTML;
-              setLocalNote({
-                ...localNote!,
-                content: serializeNoteContent(html, noteContent.blocks)
-              });
+          <TextareaAutosize
+            ref={textareaRef}
+            value={noteContent.text}
+            onChange={(e) => {
+              setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
             }}
             onKeyDown={handleKeyDown}
             onPaste={handlePasteImage}
-            onMouseUp={checkSelection}
-            onKeyUp={checkSelection}
-            data-placeholder="Start writing..."
-            className="w-full min-h-[300px] outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-stone-300"
+            placeholder="Start writing..."
+            className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
+            minRows={10}
           />
-
-          {/* Floating Selection Color Toolbar */}
-          {selectionToolbarPos && (
-            <div
-              style={{ top: Math.max(10, selectionToolbarPos.top), left: selectionToolbarPos.left }}
-              className="fixed z-50 transform -translate-x-1/2 bg-stone-900 text-white rounded-xl shadow-2xl p-1.5 flex items-center gap-1.5 border border-stone-700 animate-in fade-in zoom-in-95 duration-150"
-            >
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => applyHighlightColor(c.value)}
-                  style={{ backgroundColor: c.value }}
-                  className="w-5 h-5 rounded-full border border-white/20 hover:scale-115 transition-transform cursor-pointer"
-                  title={c.name}
-                />
-              ))}
-              <button
-                onClick={removeHighlightColor}
-                className="p-1 text-stone-400 hover:text-red-400 transition-colors ml-0.5"
-                title="Clear highlight"
-              >
-                <Ban size={13} />
-              </button>
-            </div>
-          )}
 
           {/* Centered Image Blocks (MS Word Style) */}
           {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
