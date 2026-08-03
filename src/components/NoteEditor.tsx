@@ -18,7 +18,7 @@ export function NoteEditor() {
   const { user } = useAuthStore();
   const [localNote, setLocalNote] = useState<Note | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorContentRef = useRef<HTMLDivElement>(null);
 
   const dbNote = useLiveQuery(
     () => selectedNoteId ? db.notes.get(selectedNoteId) : undefined,
@@ -100,14 +100,14 @@ export function NoteEditor() {
     setSelectedNoteId(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     const triggerKey = userProfile?.shortcut_trigger_key || 'Tab';
     const prefix = userProfile?.shortcut_prefix ?? '!';
     
     if (e.key === triggerKey) {
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
+      const target = e.currentTarget as any;
+      const start = target.selectionStart || 0;
+      const end = target.selectionEnd || 0;
       
       // If there's a selection, default behavior
       if (start !== end) return;
@@ -220,43 +220,49 @@ export function NoteEditor() {
   };
 
   const applyHighlightColor = (color: string) => {
-    if (!textareaRef.current || !localNote) return;
-    const target = textareaRef.current;
-    const start = target.selectionStart;
-    const end = target.selectionEnd;
-    if (start === end) return;
+    if (typeof window === 'undefined' || !localNote) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
 
-    const noteContent = parseNoteContent(localNote.content);
-    const text = noteContent.text;
-    const selectedText = text.substring(start, end);
-    const wrappedText = `<mark style="background-color: ${color}; color: inherit; padding: 2px 4px; border-radius: 4px;">${selectedText}</mark>`;
-    
-    const newText = text.substring(0, start) + wrappedText + text.substring(end);
-    setLocalNote({ ...localNote, content: serializeNoteContent(newText, noteContent.blocks) });
+    try {
+      const range = sel.getRangeAt(0);
+      const span = document.createElement('mark');
+      span.style.backgroundColor = color;
+      span.style.color = 'inherit';
+      span.style.padding = '2px 4px';
+      span.style.borderRadius = '4px';
+      
+      const contents = range.extractContents();
+      span.appendChild(contents);
+      range.insertNode(span);
+      sel.removeAllRanges();
+
+      if (editorContentRef.current) {
+        const html = editorContentRef.current.innerHTML;
+        const noteContent = parseNoteContent(localNote.content);
+        setLocalNote({ ...localNote, content: serializeNoteContent(html, noteContent.blocks) });
+      }
+    } catch (e) {
+      document.execCommand('hiliteColor', false, color);
+    }
     setSelectionToolbarPos(null);
   };
 
   const removeHighlightColor = () => {
-    if (!textareaRef.current || !localNote) return;
-    const target = textareaRef.current;
-    const start = target.selectionStart;
-    const end = target.selectionEnd;
-    if (start === end) return;
-
-    const noteContent = parseNoteContent(localNote.content);
-    const text = noteContent.text;
-    const selectedText = text.substring(start, end);
-    const cleanedText = selectedText.replace(/<mark[^>]*>|<\/mark>/g, '');
-
-    const newText = text.substring(0, start) + cleanedText + text.substring(end);
-    setLocalNote({ ...localNote, content: serializeNoteContent(newText, noteContent.blocks) });
+    if (typeof window === 'undefined' || !localNote) return;
+    document.execCommand('removeFormat', false);
+    if (editorContentRef.current) {
+      const html = editorContentRef.current.innerHTML;
+      const noteContent = parseNoteContent(localNote.content);
+      setLocalNote({ ...localNote, content: serializeNoteContent(html, noteContent.blocks) });
+    }
     setSelectionToolbarPos(null);
   };
 
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
+    if (e.target !== editorContentRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
+      if (editorContentRef.current) {
+        editorContentRef.current.focus();
       }
     }
   };
@@ -344,20 +350,24 @@ export function NoteEditor() {
         />
 
         <div className="flex-1 min-h-[500px] flex flex-col pb-32">
-          <TextareaAutosize
-            ref={textareaRef}
-            value={noteContent.text}
-            onChange={(e) => {
-              setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
+          <div
+            ref={editorContentRef}
+            contentEditable
+            suppressContentEditableWarning
+            dangerouslySetInnerHTML={{ __html: noteContent.text }}
+            onInput={(e) => {
+              const html = e.currentTarget.innerHTML;
+              setLocalNote({
+                ...localNote!,
+                content: serializeNoteContent(html, noteContent.blocks)
+              });
             }}
             onKeyDown={handleKeyDown}
             onPaste={handlePasteImage}
-            onSelect={checkSelection}
             onMouseUp={checkSelection}
             onKeyUp={checkSelection}
-            placeholder="Start writing..."
-            className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
-            minRows={10}
+            data-placeholder="Start writing..."
+            className="w-full min-h-[300px] outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-stone-300"
           />
 
           {/* Floating Selection Color Toolbar */}
