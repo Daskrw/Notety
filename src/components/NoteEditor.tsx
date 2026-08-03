@@ -16,6 +16,7 @@ export function NoteEditor() {
   const { user } = useAuthStore();
   const [localNote, setLocalNote] = useState<Note | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const dbNote = useLiveQuery(
     () => selectedNoteId ? db.notes.get(selectedNoteId) : undefined,
@@ -145,6 +146,16 @@ export function NoteEditor() {
     }
   };
 
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const len = textareaRef.current.value.length;
+        textareaRef.current.setSelectionRange(len, len);
+      }
+    }
+  };
+
   if (!selectedNoteId || !localNote) {
     return (
       <div className="flex-1 flex items-center justify-center text-stone-400 bg-white">
@@ -203,25 +214,27 @@ export function NoteEditor() {
       <div 
         key={selectedNoteId}
         ref={editorRef}
-        className="flex-1 overflow-y-auto px-8 py-12 w-full max-w-5xl mx-auto flex flex-col gap-4 custom-scrollbar"
+        className="flex-1 overflow-y-auto px-8 py-12 w-full max-w-5xl mx-auto flex flex-col gap-4 custom-scrollbar cursor-text"
+        onClick={handleContainerClick}
       >
         <input
           type="text"
           value={localNote.title}
           onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
           placeholder="Note Title"
-          className="w-full text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-8"
+          className="w-full text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-8 cursor-text"
         />
 
         <div className="flex-1 min-h-[500px] flex flex-col pb-32">
           <TextareaAutosize
+            ref={textareaRef}
             value={noteContent.text}
             onChange={(e) => {
               setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
             }}
             onKeyDown={handleKeyDown}
             placeholder="Start writing..."
-            className="w-full resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
+            className="w-full min-h-[400px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
             minRows={15}
           />
         </div>
