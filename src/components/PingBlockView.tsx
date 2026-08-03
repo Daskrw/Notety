@@ -36,32 +36,38 @@ export function PingBlockView({ block, onChange, onRemove }: Props) {
   };
 
   return (
-    <div className="group relative flex items-center bg-green-50 border border-green-200 rounded-lg overflow-hidden my-1 w-full shadow-sm transition-all hover:border-green-300">
-      <div 
-        className="px-2 py-3 bg-green-100/50 cursor-grab active:cursor-grabbing text-green-500 hover:text-green-700 transition-colors select-none shrink-0"
-        onMouseDown={onMouseDown}
-      >
-        <GripVertical size={16} />
+    <div className="group relative flex flex-col bg-green-50/70 border border-green-200 rounded-lg overflow-hidden my-1.5 w-full shadow-sm transition-all hover:border-green-300">
+      {/* Upper: Input & Controls */}
+      <div className="flex items-center bg-green-100/50 border-b border-green-200/60 px-1 py-0.5">
+        <div 
+          className="px-1.5 py-1.5 cursor-grab active:cursor-grabbing text-green-600 hover:text-green-800 transition-colors select-none shrink-0"
+          onMouseDown={onMouseDown}
+        >
+          <GripVertical size={14} />
+        </div>
+        <div className="flex items-center justify-center p-1 text-green-700 shrink-0">
+          <Activity size={14} />
+        </div>
+        <input
+          type="text"
+          value={block.value}
+          onChange={handleInputChange}
+          placeholder="5-digit ping"
+          className="flex-1 px-2 py-1 bg-transparent outline-none text-green-900 text-xs font-mono placeholder:text-green-400 font-medium"
+        />
+        <button 
+          onClick={onRemove}
+          className="opacity-0 group-hover:opacity-100 p-1 text-green-500 hover:text-red-500 transition-all mr-1"
+        >
+          &times;
+        </button>
       </div>
-      <div className="flex items-center justify-center p-2.5 bg-green-200 shrink-0">
-        <Activity size={16} className="text-green-700" />
+
+      {/* Below: Signal Output */}
+      <div className="px-3 py-2 text-xs font-mono font-medium text-green-800 bg-white/70 flex items-center justify-between gap-2">
+        <span className="text-[10px] text-green-600 uppercase tracking-wider font-sans font-medium shrink-0">Signal:</span>
+        <span className="truncate">{getSignal(block.value)}</span>
       </div>
-      <input
-        type="text"
-        value={block.value}
-        onChange={handleInputChange}
-        placeholder="5-digit ping"
-        className="w-28 px-3 py-2 bg-transparent outline-none text-green-900 text-xs font-mono placeholder:text-green-400 shrink-0"
-      />
-      <div className="flex-1 px-3 py-2 border-l border-green-200 text-xs font-mono text-green-700 bg-white/50 truncate whitespace-nowrap">
-        {getSignal(block.value)}
-      </div>
-      <button 
-        onClick={onRemove}
-        className="z-10 opacity-0 group-hover:opacity-100 p-2 text-green-500 hover:text-red-500 transition-all absolute right-1"
-      >
-        &times;
-      </button>
     </div>
   );
 }
