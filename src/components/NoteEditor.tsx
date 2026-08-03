@@ -5,11 +5,12 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu, Ban } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { ImageBlockView } from './ImageBlockView';
+import { TextHighlightToolbar, PRESET_COLORS } from './TextHighlightToolbar';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 export function NoteEditor() {
@@ -199,6 +200,59 @@ export function NoteEditor() {
     }
   };
 
+  const [selectionToolbarPos, setSelectionToolbarPos] = useState<{ top: number; left: number } | null>(null);
+
+  const checkSelection = () => {
+    if (typeof window === 'undefined') return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      setSelectionToolbarPos(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setSelectionToolbarPos({
+        top: rect.top - 40,
+        left: rect.left + rect.width / 2,
+      });
+    }
+  };
+
+  const applyHighlightColor = (color: string) => {
+    if (!textareaRef.current || !localNote) return;
+    const target = textareaRef.current;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    if (start === end) return;
+
+    const noteContent = parseNoteContent(localNote.content);
+    const text = noteContent.text;
+    const selectedText = text.substring(start, end);
+    const wrappedText = `<mark style="background-color: ${color}; color: inherit; padding: 2px 4px; border-radius: 4px;">${selectedText}</mark>`;
+    
+    const newText = text.substring(0, start) + wrappedText + text.substring(end);
+    setLocalNote({ ...localNote, content: serializeNoteContent(newText, noteContent.blocks) });
+    setSelectionToolbarPos(null);
+  };
+
+  const removeHighlightColor = () => {
+    if (!textareaRef.current || !localNote) return;
+    const target = textareaRef.current;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    if (start === end) return;
+
+    const noteContent = parseNoteContent(localNote.content);
+    const text = noteContent.text;
+    const selectedText = text.substring(start, end);
+    const cleanedText = selectedText.replace(/<mark[^>]*>|<\/mark>/g, '');
+
+    const newText = text.substring(0, start) + cleanedText + text.substring(end);
+    setLocalNote({ ...localNote, content: serializeNoteContent(newText, noteContent.blocks) });
+    setSelectionToolbarPos(null);
+  };
+
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
       if (textareaRef.current) {
@@ -243,7 +297,11 @@ export function NoteEditor() {
           </select>
         </div>
 
-        <div className="flex items-center space-x-4 text-stone-400">
+        <div className="flex items-center space-x-3 text-stone-400">
+          <TextHighlightToolbar
+            onSelectColor={(color) => applyHighlightColor(color)}
+            onClearHighlight={() => removeHighlightColor()}
+          />
           <button
             onClick={toggleFeatured}
             title="Feature this note"
@@ -294,10 +352,38 @@ export function NoteEditor() {
             }}
             onKeyDown={handleKeyDown}
             onPaste={handlePasteImage}
+            onSelect={checkSelection}
+            onMouseUp={checkSelection}
+            onKeyUp={checkSelection}
             placeholder="Start writing..."
             className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
             minRows={10}
           />
+
+          {/* Floating Selection Color Toolbar */}
+          {selectionToolbarPos && (
+            <div
+              style={{ top: Math.max(10, selectionToolbarPos.top), left: selectionToolbarPos.left }}
+              className="fixed z-50 transform -translate-x-1/2 bg-stone-900 text-white rounded-xl shadow-2xl p-1.5 flex items-center gap-1.5 border border-stone-700 animate-in fade-in zoom-in-95 duration-150"
+            >
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => applyHighlightColor(c.value)}
+                  style={{ backgroundColor: c.value }}
+                  className="w-5 h-5 rounded-full border border-white/20 hover:scale-115 transition-transform cursor-pointer"
+                  title={c.name}
+                />
+              ))}
+              <button
+                onClick={removeHighlightColor}
+                className="p-1 text-stone-400 hover:text-red-400 transition-colors ml-0.5"
+                title="Clear highlight"
+              >
+                <Ban size={13} />
+              </button>
+            </div>
+          )}
 
           {/* Centered Image Blocks (MS Word Style) */}
           {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
