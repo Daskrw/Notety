@@ -26,10 +26,17 @@ export function NoteEditor() {
   const categories = useLiveQuery(() => db.categories.toArray());
   const snippets = useLiveQuery(async (): Promise<Snippet[]> => db.snippets.toArray());
 
+  const activeNoteIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (dbNote) setLocalNote(dbNote);
-    else setLocalNote(null);
-  }, [dbNote]);
+    // Only load note from DB when switching notes or initial load
+    if (selectedNoteId !== activeNoteIdRef.current) {
+      activeNoteIdRef.current = selectedNoteId;
+      setLocalNote(dbNote || null);
+    } else if (!localNote && dbNote) {
+      setLocalNote(dbNote);
+    }
+  }, [selectedNoteId, dbNote, localNote]);
 
   useAutoSave(localNote, 1500);
 
@@ -150,8 +157,6 @@ export function NoteEditor() {
     if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
       if (textareaRef.current) {
         textareaRef.current.focus();
-        const len = textareaRef.current.value.length;
-        textareaRef.current.setSelectionRange(len, len);
       }
     }
   };
