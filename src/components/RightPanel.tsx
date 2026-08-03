@@ -103,7 +103,12 @@ export function RightPanel() {
     if (!localNote || !user) return;
     const noteContent = parseNoteContent(localNote.content);
     const newBlocks = [...noteContent.blocks];
-    newBlocks[index] = { ...newBlocks[index], value: val };
+    const current = newBlocks[index];
+    if (current.type === 'image') {
+      newBlocks[index] = { ...current, caption: val };
+    } else {
+      newBlocks[index] = { ...current, value: val } as any;
+    }
     
     await db.notes.update(localNote.id, {
       content: serializeNoteContent(noteContent.text, newBlocks),

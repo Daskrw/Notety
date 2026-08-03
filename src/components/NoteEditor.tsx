@@ -7,8 +7,9 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
 import { Star, Trash2, PanelRightOpen, Menu } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
-import { parseNoteContent, serializeNoteContent, EditorBlock } from '@/lib/blocks';
+import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
+import { ImageBlockView } from './ImageBlockView';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 export function NoteEditor() {
@@ -149,6 +150,55 @@ export function NoteEditor() {
     }
   };
 
+  const updateImageCaption = (id: string, caption: string) => {
+    if (!localNote) return;
+    const content = parseNoteContent(localNote.content);
+    const newBlocks = content.blocks.map(b => {
+      if (b.id === id && b.type === 'image') {
+        return { ...b, caption };
+      }
+      return b;
+    });
+    setLocalNote({ ...localNote, content: serializeNoteContent(content.text, newBlocks) });
+  };
+
+  const removeImageBlock = (id: string) => {
+    if (!localNote) return;
+    const content = parseNoteContent(localNote.content);
+    const newBlocks = content.blocks.filter(b => b.id !== id);
+    setLocalNote({ ...localNote, content: serializeNoteContent(content.text, newBlocks) });
+  };
+
+  const handlePasteImage = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file && localNote) {
+          e.preventDefault();
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            if (dataUrl) {
+              const content = parseNoteContent(localNote.content);
+              const newImage: ImageBlock = {
+                id: crypto.randomUUID(),
+                type: 'image',
+                url: dataUrl,
+                caption: ''
+              };
+              setLocalNote({
+                ...localNote,
+                content: serializeNoteContent(content.text, [...content.blocks, newImage])
+              });
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+  };
+
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
       if (textareaRef.current) {
@@ -243,10 +293,24 @@ export function NoteEditor() {
               setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
             }}
             onKeyDown={handleKeyDown}
+            onPaste={handlePasteImage}
             placeholder="Start writing..."
-            className="w-full min-h-[400px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
-            minRows={15}
+            className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
+            minRows={10}
           />
+
+          {/* Centered Image Blocks (MS Word Style) */}
+          {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
+            const imgBlock = block as ImageBlock;
+            return (
+              <ImageBlockView
+                key={imgBlock.id}
+                block={imgBlock}
+                onChange={(caption) => updateImageCaption(imgBlock.id, caption)}
+                onRemove={() => removeImageBlock(imgBlock.id)}
+              />
+            );
+          })}
         </div>
       </div>
       
