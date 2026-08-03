@@ -153,11 +153,7 @@ export function Sidebar() {
   };
 
   if (!isSidebarOpen) {
-    return (
-      <button onClick={toggleSidebar} className="p-4 fixed top-0 left-0 hover:bg-stone-100 rounded-br-lg transition-colors z-50 group">
-        <Menu className="w-5 h-5 text-stone-400 group-hover:text-stone-700" />
-      </button>
-    );
+    return null;
   }
 
   return (

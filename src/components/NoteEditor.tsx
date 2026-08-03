@@ -5,14 +5,14 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 export function NoteEditor() {
-  const { selectedNoteId, setSelectedNoteId, userProfile, isRightPanelOpen, toggleRightPanel } = useAppStore();
+  const { selectedNoteId, setSelectedNoteId, userProfile, isRightPanelOpen, toggleRightPanel, isSidebarOpen, toggleSidebar } = useAppStore();
   const { user } = useAuthStore();
   const [localNote, setLocalNote] = useState<Note | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -170,7 +170,16 @@ export function NoteEditor() {
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-white">
       {/* Top Toolbar */}
       <div className="h-16 flex items-center justify-between px-8 border-b border-stone-100 flex-shrink-0">
-        <div className="flex items-center">
+        <div className="flex items-center space-x-2">
+          {!isSidebarOpen && (
+            <button
+              onClick={toggleSidebar}
+              title="Open sidebar"
+              className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-md transition-colors mr-1"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          )}
           <select
             value={localNote.category_id || 'uncategorized'}
             onChange={(e) => updateCategory(e.target.value)}
