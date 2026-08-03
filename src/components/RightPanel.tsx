@@ -10,6 +10,7 @@ import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 import { parseNoteContent, serializeNoteContent } from '@/lib/blocks';
 import { PasswordBlockView } from './PasswordBlockView';
 import { PingBlockView } from './PingBlockView';
+import { JobBlockView } from './JobBlockView';
 
 export function RightPanel() {
   const { isRightPanelOpen, toggleRightPanel, selectedNoteId, setIsHighlightModalOpen, setActiveHighlightId } = useAppStore();
@@ -45,7 +46,7 @@ export function RightPanel() {
 
       const noteContent = parseNoteContent(note.content);
       const droppedBlock = {
-        id: ['template-password', 'template-ping'].includes(payload.id)
+        id: ['template-password', 'template-ping', 'template-job'].includes(payload.id)
           ? crypto.randomUUID()
           : payload.id,
         type: payload.type,
@@ -55,9 +56,9 @@ export function RightPanel() {
       const newBlocks = [...noteContent.blocks];
       const existingIdx = newBlocks.findIndex(b => b.id === droppedBlock.id);
       if (existingIdx !== -1) {
-        newBlocks[existingIdx] = droppedBlock;
+        newBlocks[existingIdx] = droppedBlock as any;
       } else {
-        newBlocks.push(droppedBlock);
+        newBlocks.push(droppedBlock as any);
       }
 
       await db.notes.update(noteId, {
@@ -98,7 +99,7 @@ export function RightPanel() {
     setIsHighlightModalOpen(true);
   };
 
-  const updateBlock = async (index: number, val: string) => {
+  const updateBlock = async (index: number, val: any) => {
     if (!localNote || !user) return;
     const noteContent = parseNoteContent(localNote.content);
     const newBlocks = [...noteContent.blocks];
@@ -249,6 +250,13 @@ export function RightPanel() {
                   {block.type === 'ping' && (
                     <PingBlockView 
                       block={block}
+                      onChange={(val) => updateBlock(index, val)}
+                      onRemove={() => removeBlock(index)}
+                    />
+                  )}
+                  {block.type === 'job' && (
+                    <JobBlockView 
+                      block={block as any}
                       onChange={(val) => updateBlock(index, val)}
                       onRemove={() => removeBlock(index)}
                     />

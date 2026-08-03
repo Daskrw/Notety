@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'password' | 'ping';
+export type BlockType = 'text' | 'password' | 'ping' | 'job';
 
 export interface BaseBlock {
   id: string;
@@ -20,7 +20,22 @@ export interface PingBlock extends BaseBlock {
   value: string;
 }
 
-export type EditorBlock = TextBlock | PasswordBlock | PingBlock;
+export interface JobTaskItem {
+  id: string;
+  text: string;
+}
+
+export interface JobBlockValue {
+  totalTasks: number;
+  tasks: JobTaskItem[];
+}
+
+export interface JobBlock extends BaseBlock {
+  type: 'job';
+  value: JobBlockValue | string;
+}
+
+export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock;
 
 export interface NoteContent {
   text: string;

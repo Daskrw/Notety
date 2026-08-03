@@ -2,8 +2,8 @@ import { useCallback, useRef, useEffect } from 'react';
 
 export interface DragBlockPayload {
   id: string;
-  type: 'password' | 'ping';
-  value: string;
+  type: 'password' | 'ping' | 'job';
+  value: any;
 }
 
 interface DragState {
