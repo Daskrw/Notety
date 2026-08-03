@@ -26,17 +26,13 @@ export function NoteEditor() {
   const categories = useLiveQuery(() => db.categories.toArray());
   const snippets = useLiveQuery(async (): Promise<Snippet[]> => db.snippets.toArray());
 
-  const activeNoteIdRef = useRef<string | null>(null);
-
   useEffect(() => {
-    // Only load note from DB when switching notes or initial load
-    if (selectedNoteId !== activeNoteIdRef.current) {
-      activeNoteIdRef.current = selectedNoteId;
-      setLocalNote(dbNote || null);
-    } else if (!localNote && dbNote) {
+    if (!selectedNoteId) {
+      setLocalNote(null);
+    } else if (dbNote && dbNote.id !== localNote?.id) {
       setLocalNote(dbNote);
     }
-  }, [selectedNoteId, dbNote, localNote]);
+  }, [selectedNoteId, dbNote, localNote?.id]);
 
   useAutoSave(localNote, 1500);
 
