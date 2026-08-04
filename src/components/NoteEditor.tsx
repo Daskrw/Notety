@@ -30,10 +30,21 @@ export function NoteEditor() {
   useEffect(() => {
     if (!selectedNoteId) {
       setLocalNote(null);
-    } else if (dbNote && dbNote.id !== localNote?.id) {
-      setLocalNote(dbNote);
+    } else if (dbNote) {
+      if (dbNote.id !== localNote?.id) {
+        setLocalNote(dbNote);
+      } else {
+        const localParsed = parseNoteContent(localNote.content);
+        const dbParsed = parseNoteContent(dbNote.content);
+        if (JSON.stringify(localParsed.blocks) !== JSON.stringify(dbParsed.blocks)) {
+          setLocalNote(prev => prev ? {
+            ...prev,
+            content: serializeNoteContent(localParsed.text, dbParsed.blocks)
+          } : null);
+        }
+      }
     }
-  }, [selectedNoteId, dbNote, localNote?.id]);
+  }, [selectedNoteId, dbNote, localNote]);
 
   useAutoSave(localNote, 1500);
 
