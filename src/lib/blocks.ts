@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image';
+export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule';
 
 export interface BaseBlock {
   id: string;
@@ -41,7 +41,25 @@ export interface ImageBlock extends BaseBlock {
   caption?: string;
 }
 
-export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock;
+export interface ScheduleDayDetail {
+  dateStr: string;
+  category: 'holiday' | 'work' | 'off' | 'custom';
+  title?: string;
+  shiftTimes?: string;
+}
+
+export interface ScheduleBlockValue {
+  year: number;
+  month: number;
+  dayDetails: Record<string, ScheduleDayDetail>;
+}
+
+export interface ScheduleBlock extends BaseBlock {
+  type: 'schedule';
+  value: ScheduleBlockValue | string;
+}
+
+export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock;
 
 export interface NoteContent {
   text: string;

@@ -11,6 +11,7 @@ import { parseNoteContent, serializeNoteContent } from '@/lib/blocks';
 import { PasswordBlockView } from './PasswordBlockView';
 import { PingBlockView } from './PingBlockView';
 import { JobBlockView } from './JobBlockView';
+import { ScheduleBlockView } from './ScheduleBlockView';
 
 export function RightPanel() {
   const { isRightPanelOpen, toggleRightPanel, selectedNoteId, setIsHighlightModalOpen, setActiveHighlightId } = useAppStore();
@@ -46,7 +47,7 @@ export function RightPanel() {
 
       const noteContent = parseNoteContent(note.content);
       const droppedBlock = {
-        id: ['template-password', 'template-ping', 'template-job'].includes(payload.id)
+        id: ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id)
           ? crypto.randomUUID()
           : payload.id,
         type: payload.type,
@@ -261,6 +262,13 @@ export function RightPanel() {
                   )}
                   {block.type === 'job' && (
                     <JobBlockView 
+                      block={block as any}
+                      onChange={(val) => updateBlock(index, val)}
+                      onRemove={() => removeBlock(index)}
+                    />
+                  )}
+                  {block.type === 'schedule' && (
+                    <ScheduleBlockView 
                       block={block as any}
                       onChange={(val) => updateBlock(index, val)}
                       onRemove={() => removeBlock(index)}

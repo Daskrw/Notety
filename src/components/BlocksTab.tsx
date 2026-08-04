@@ -1,5 +1,5 @@
 "use client";
-import { Lock, Activity, Briefcase, Image as ImageIcon } from 'lucide-react';
+import { Lock, Activity, Briefcase, Image as ImageIcon, Calendar } from 'lucide-react';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 import { useAppStore } from '@/store/useStore';
 import { db } from '@/lib/db';
@@ -47,6 +47,25 @@ function JobBlockDraggable() {
     >
       <Briefcase size={14} className="text-blue-600" />
       <span className="text-sm font-medium text-stone-700">Job Progress</span>
+    </div>
+  );
+}
+
+function ScheduleBlockDraggable() {
+  const now = new Date();
+  const payload = { 
+    id: 'template-schedule', 
+    type: 'schedule' as const, 
+    value: { year: now.getFullYear(), month: now.getMonth(), dayDetails: {} } 
+  };
+  const { onMouseDown } = useDraggableBlock(payload, '📅 Work Schedule');
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-stone-200 rounded-md cursor-grab active:cursor-grabbing hover:bg-stone-100 hover:border-stone-300 transition-all shadow-sm select-none"
+    >
+      <Calendar size={14} className="text-amber-600" />
+      <span className="text-sm font-medium text-stone-700">Schedule</span>
     </div>
   );
 }
@@ -107,6 +126,7 @@ export function BlocksTab() {
       <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider mr-4">Blocks</span>
       <PingBlockDraggable />
       <JobBlockDraggable />
+      <ScheduleBlockDraggable />
     </div>
   );
 }
