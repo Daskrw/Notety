@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { createHighlight, deleteHighlight } from '@/lib/data';
-import { PanelRightClose, Plus, FileText, Trash2, Layers, Sparkles } from 'lucide-react';
+import { PanelRightClose, Plus, FileText, Trash2, Layers, Sparkles, Pin, PinOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 import { parseNoteContent, serializeNoteContent } from '@/lib/blocks';
@@ -14,7 +14,10 @@ import { JobBlockView } from './JobBlockView';
 import { ScheduleBlockView } from './ScheduleBlockView';
 
 export function RightPanel() {
-  const { isRightPanelOpen, toggleRightPanel, selectedNoteId, setIsHighlightModalOpen, setActiveHighlightId } = useAppStore();
+  const { 
+    isRightPanelOpen, isRightPanelPinned, toggleRightPanelPin, setRightPanelHovered,
+    selectedNoteId, setIsHighlightModalOpen, setActiveHighlightId 
+  } = useAppStore();
   const { user } = useAuthStore();
   const [isCreating, setIsCreating] = useState(false);
   const [newHighlightName, setNewHighlightName] = useState('');
@@ -54,13 +57,7 @@ export function RightPanel() {
         value: payload.value,
       };
 
-      const newBlocks = [...noteContent.blocks];
-      const existingIdx = newBlocks.findIndex(b => b.id === droppedBlock.id);
-      if (existingIdx !== -1) {
-        newBlocks[existingIdx] = droppedBlock as any;
-      } else {
-        newBlocks.push(droppedBlock as any);
-      }
+      const newBlocks = [...noteContent.blocks, droppedBlock];
 
       await db.notes.update(noteId, {
         content: serializeNoteContent(noteContent.text, newBlocks),
@@ -70,7 +67,7 @@ export function RightPanel() {
       // Auto switch to blocks tab
       setActiveTab('blocks');
     });
-    return unregister;
+    return () => unregister();
   }, []);
 
   const highlights = useLiveQuery(
@@ -82,7 +79,8 @@ export function RightPanel() {
     [selectedNoteId]
   );
 
-  const handleCreateHighlight = async () => {
+  const handleCreateHighlight = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!selectedNoteId || !newHighlightName.trim() || !user) return;
     await createHighlight(user.id, selectedNoteId, newHighlightName.trim());
     setNewHighlightName('');
@@ -120,8 +118,7 @@ export function RightPanel() {
   const removeBlock = async (index: number) => {
     if (!localNote || !user) return;
     const noteContent = parseNoteContent(localNote.content);
-    const newBlocks = [...noteContent.blocks];
-    newBlocks.splice(index, 1);
+    const newBlocks = noteContent.blocks.filter((_, i) => i !== index);
 
     await db.notes.update(localNote.id, {
       content: serializeNoteContent(noteContent.text, newBlocks),
@@ -133,18 +130,23 @@ export function RightPanel() {
     return null;
   }
 
-  const noteContent = localNote ? parseNoteContent(localNote.content) : { text: '', blocks: [] };
+  const noteContent = parseNoteContent(localNote?.content || '');
 
   return (
     <aside 
       ref={panelRef}
-      className="w-96 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-[-4px_0_24px_rgba(0,0,0,0.02)] shrink-0"
+      onMouseLeave={() => { if (!isRightPanelPinned) setRightPanelHovered(false); }}
+      className="w-96 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-xl z-40 shrink-0"
     >
       {/* Header */}
       <div className="h-16 px-5 flex items-center justify-between border-b border-stone-100 flex-shrink-0">
         <span className="text-xs font-heading font-semibold tracking-widest text-stone-500 uppercase">Panel</span>
-        <button onClick={toggleRightPanel} className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-md transition-colors">
-          <PanelRightClose className="w-4 h-4" />
+        <button 
+          onClick={toggleRightPanelPin} 
+          title={isRightPanelPinned ? "Pin active (click to enable hover peek)" : "Unpinned (hover to peek, click to pin)"}
+          className={`p-1.5 rounded-md transition-colors ${isRightPanelPinned ? 'text-stone-500 hover:text-stone-800 hover:bg-stone-100' : 'text-amber-600 bg-amber-100/70 hover:bg-amber-200/80'}`}
+        >
+          {isRightPanelPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
         </button>
       </div>
 

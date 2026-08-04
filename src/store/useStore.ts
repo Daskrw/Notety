@@ -22,11 +22,22 @@ export interface ConfirmConfig {
 }
 
 interface AppState {
-  // General UI
+  // Sidebar (Left Panel)
+  isSidebarPinned: boolean;
+  isSidebarHovered: boolean;
   isSidebarOpen: boolean;
+  toggleSidebarPin: () => void;
+  setSidebarHovered: (hovered: boolean) => void;
   toggleSidebar: () => void;
+
+  // Right Panel
+  isRightPanelPinned: boolean;
+  isRightPanelHovered: boolean;
   isRightPanelOpen: boolean;
+  toggleRightPanelPin: () => void;
+  setRightPanelHovered: (hovered: boolean) => void;
   toggleRightPanel: () => void;
+
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 
@@ -62,11 +73,39 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  // General UI
+  // Sidebar (Left Panel)
+  isSidebarPinned: true,
+  isSidebarHovered: false,
   isSidebarOpen: true,
-  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  toggleSidebarPin: () => set((state) => {
+    const nextPinned = !state.isSidebarPinned;
+    return { isSidebarPinned: nextPinned, isSidebarOpen: nextPinned || state.isSidebarHovered };
+  }),
+  setSidebarHovered: (hovered: boolean) => set((state) => ({
+    isSidebarHovered: hovered,
+    isSidebarOpen: state.isSidebarPinned || hovered
+  })),
+  toggleSidebar: () => set((state) => {
+    const nextPinned = !state.isSidebarPinned;
+    return { isSidebarPinned: nextPinned, isSidebarOpen: nextPinned || state.isSidebarHovered };
+  }),
+
+  // Right Panel
+  isRightPanelPinned: true,
+  isRightPanelHovered: false,
   isRightPanelOpen: true,
-  toggleRightPanel: () => set((state) => ({ isRightPanelOpen: !state.isRightPanelOpen })),
+  toggleRightPanelPin: () => set((state) => {
+    const nextPinned = !state.isRightPanelPinned;
+    return { isRightPanelPinned: nextPinned, isRightPanelOpen: nextPinned || state.isRightPanelHovered };
+  }),
+  setRightPanelHovered: (hovered: boolean) => set((state) => ({
+    isRightPanelHovered: hovered,
+    isRightPanelOpen: state.isRightPanelPinned || hovered
+  })),
+  toggleRightPanel: () => set((state) => {
+    const nextPinned = !state.isRightPanelPinned;
+    return { isRightPanelPinned: nextPinned, isRightPanelOpen: nextPinned || state.isRightPanelHovered };
+  }),
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
 

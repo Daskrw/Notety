@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note, Category } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { createNote, createCategory, deleteCategory, updateCategoryOrder, updateNote } from '@/lib/data';
-import { Plus, Star, Menu, Settings, Search, Folder, ChevronDown, ChevronRight, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Star, Menu, Settings, Search, Folder, ChevronDown, ChevronRight, Trash2, Edit2, Pin, PinOff } from 'lucide-react';
 
 function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
   const hue = seed.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
@@ -21,7 +21,7 @@ function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
 
 export function Sidebar() {
   const {
-    isSidebarOpen, toggleSidebar,
+    isSidebarOpen, isSidebarPinned, toggleSidebarPin, setSidebarHovered,
     selectedNoteId, setSelectedNoteId,
     searchQuery, setSearchQuery,
     setIsEditCategoryModalOpen, setEditingCategoryId,
@@ -157,15 +157,22 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-72 bg-stone-50 border-r border-stone-200 h-screen flex flex-col transition-all duration-300 shrink-0">
+    <aside 
+      onMouseLeave={() => { if (!isSidebarPinned) setSidebarHovered(false); }}
+      className="w-72 bg-stone-50 border-r border-stone-200 h-screen flex flex-col transition-all duration-300 shrink-0 shadow-lg z-40"
+    >
       {/* Header */}
       <div className="h-16 px-5 flex items-center justify-between border-b border-stone-200 bg-stone-100/50">
         <div className="flex items-center space-x-2 text-stone-700">
           <Settings className="w-4 h-4 cursor-pointer hover:text-stone-900 transition-colors" />
           <span className="text-sm font-heading font-medium tracking-wide">WORKSPACE</span>
         </div>
-        <button onClick={toggleSidebar} className="text-stone-400 hover:text-stone-700 transition-colors">
-          <Menu className="w-4 h-4" />
+        <button 
+          onClick={toggleSidebarPin} 
+          title={isSidebarPinned ? "Pin active (click to enable hover peek)" : "Unpinned (hover to peek, click to pin)"}
+          className={`p-1.5 rounded-md transition-colors ${isSidebarPinned ? 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/60' : 'text-amber-600 bg-amber-100/70 hover:bg-amber-200/80'}`}
+        >
+          {isSidebarPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
         </button>
       </div>
 
