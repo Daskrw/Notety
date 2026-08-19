@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Briefcase, GripVertical, CheckCircle2, Circle, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import { JobBlock, JobBlockValue, JobTaskItem } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
+import { useAppStore } from '@/store/useStore';
 
 interface Props {
   block: JobBlock;
@@ -48,6 +49,7 @@ function ProgressCircle({ completed, total }: { completed: number; total: number
 }
 
 export function JobBlockView({ block, onChange, onRemove }: Props) {
+  const { setConfirmConfig } = useAppStore();
   const { onMouseDown } = useDraggableBlock(
     { id: block.id, type: 'job', value: block.value },
     '💼 Job Progress'
@@ -108,6 +110,17 @@ export function JobBlockView({ block, onChange, onRemove }: Props) {
   const handleDeleteTask = (index: number) => {
     const newTasks = tasks.filter((_, i) => i !== index);
     onChange({ totalTasks: newTasks.length, tasks: newTasks });
+  };
+
+  const handlePromptReset = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Reset Job Tasks?',
+      message: 'Are you sure you want to reset all tasks in this job block? All entered data will be cleared.',
+      onConfirm: () => {
+        onChange({ totalTasks: 0, tasks: [] });
+      }
+    });
   };
 
   const completedCount = tasks.filter(t => !!t.completed).length;
@@ -194,7 +207,7 @@ export function JobBlockView({ block, onChange, onRemove }: Props) {
           </button>
 
           <button
-            onClick={() => onChange({ totalTasks: 0, tasks: [] })}
+            onClick={handlePromptReset}
             title="Reset task list"
             className="p-1 text-stone-400 hover:text-blue-600 rounded transition-colors"
           >
