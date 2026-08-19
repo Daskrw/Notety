@@ -49,10 +49,15 @@ export function RightPanel() {
       if (!note) return;
 
       const noteContent = parseNoteContent(note.content);
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id);
+
+      // If it's an existing block already in the note, do not duplicate
+      if (!isTemplate && noteContent.blocks.some(b => b.id === payload.id)) {
+        return;
+      }
+
       const droppedBlock = {
-        id: ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id)
-          ? crypto.randomUUID()
-          : payload.id,
+        id: isTemplate ? crypto.randomUUID() : payload.id,
         type: payload.type,
         value: payload.value,
       };
