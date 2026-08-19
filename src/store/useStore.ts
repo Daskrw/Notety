@@ -72,11 +72,13 @@ interface AppState {
   setUserProfile: (profile: UserProfile | null) => void;
 }
 
+const isLargeScreen = typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
+
 export const useAppStore = create<AppState>((set) => ({
   // Sidebar (Left Panel)
-  isSidebarPinned: true,
+  isSidebarPinned: isLargeScreen,
   isSidebarHovered: false,
-  isSidebarOpen: true,
+  isSidebarOpen: isLargeScreen,
   toggleSidebarPin: () => set((state) => {
     const nextPinned = !state.isSidebarPinned;
     return { isSidebarPinned: nextPinned, isSidebarOpen: nextPinned || state.isSidebarHovered };
@@ -91,9 +93,9 @@ export const useAppStore = create<AppState>((set) => ({
   }),
 
   // Right Panel
-  isRightPanelPinned: true,
+  isRightPanelPinned: isLargeScreen,
   isRightPanelHovered: false,
-  isRightPanelOpen: true,
+  isRightPanelOpen: isLargeScreen,
   toggleRightPanelPin: () => set((state) => {
     const nextPinned = !state.isRightPanelPinned;
     return { isRightPanelPinned: nextPinned, isRightPanelOpen: nextPinned || state.isRightPanelHovered };
