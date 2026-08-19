@@ -23,6 +23,7 @@ export interface PingBlock extends BaseBlock {
 export interface JobTaskItem {
   id: string;
   text: string;
+  completed?: boolean;
 }
 
 export interface JobBlockValue {
