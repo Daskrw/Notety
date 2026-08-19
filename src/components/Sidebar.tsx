@@ -153,26 +153,38 @@ export function Sidebar() {
   };
 
   return (
-    <aside 
-      onMouseLeave={() => { if (!isSidebarPinned) setSidebarHovered(false); }}
-      className={`w-72 bg-stone-50 border-r border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shrink-0 shadow-lg z-40 ${
-        isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 -mr-72 pointer-events-none'
-      }`}
-    >
-      {/* Header */}
-      <div className="h-16 px-5 flex items-center justify-between border-b border-stone-200 bg-stone-100/50">
-        <div className="flex items-center space-x-2 text-stone-700">
-          <Settings className="w-4 h-4 cursor-pointer hover:text-stone-900 transition-colors" />
-          <span className="text-sm font-heading font-medium tracking-wide">WORKSPACE</span>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => {
+            if (isSidebarPinned) toggleSidebarPin();
+            setSidebarHovered(false);
+          }}
+          className="fixed inset-0 bg-black/30 backdrop-blur-xs z-35 md:hidden transition-opacity"
+        />
+      )}
+
+      <aside 
+        onMouseLeave={() => { if (!isSidebarPinned) setSidebarHovered(false); }}
+        className={`w-72 max-w-[85vw] fixed md:static top-0 left-0 bottom-0 bg-stone-50 border-r border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shrink-0 shadow-lg z-40 ${
+          isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 md:-mr-72 pointer-events-none'
+        }`}
+      >
+        {/* Header */}
+        <div className="h-16 px-5 flex items-center justify-between border-b border-stone-200 bg-stone-100/50">
+          <div className="flex items-center space-x-2 text-stone-700">
+            <Settings className="w-4 h-4 cursor-pointer hover:text-stone-900 transition-colors" />
+            <span className="text-sm font-heading font-medium tracking-wide">WORKSPACE</span>
+          </div>
+          <button 
+            onClick={toggleSidebarPin} 
+            title={isSidebarPinned ? "Pin active (click to unpin)" : "Unpinned (click to pin)"}
+            className={`p-1.5 rounded-md transition-colors ${isSidebarPinned ? 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/60' : 'text-amber-600 bg-amber-100/70 hover:bg-amber-200/80'}`}
+          >
+            {isSidebarPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
+          </button>
         </div>
-        <button 
-          onClick={toggleSidebarPin} 
-          title={isSidebarPinned ? "Pin active (click to unpin)" : "Unpinned (click to pin)"}
-          className={`p-1.5 rounded-md transition-colors ${isSidebarPinned ? 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/60' : 'text-amber-600 bg-amber-100/70 hover:bg-amber-200/80'}`}
-        >
-          {isSidebarPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
-        </button>
-      </div>
 
       {/* Search */}
       <div className="p-4 border-b border-stone-200 bg-white">
@@ -341,5 +353,6 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

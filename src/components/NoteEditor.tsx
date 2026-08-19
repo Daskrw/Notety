@@ -263,7 +263,7 @@ export function NoteEditor() {
   return (
     <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
       {/* Top Toolbar */}
-      <div className="h-16 flex items-center justify-between px-8 border-b border-stone-100 flex-shrink-0">
+      <div className="h-16 flex items-center justify-between px-3 sm:px-8 border-b border-stone-100 flex-shrink-0">
         <div className="flex items-center space-x-2">
           {!isSidebarPinned && (
             <button
@@ -280,7 +280,7 @@ export function NoteEditor() {
           <select
             value={localNote.category_id || 'uncategorized'}
             onChange={(e) => updateCategory(e.target.value)}
-            className="text-xs font-medium text-stone-500 bg-transparent outline-none cursor-pointer hover:text-stone-800 transition-colors"
+            className="text-xs font-medium text-stone-500 bg-transparent outline-none cursor-pointer hover:text-stone-800 transition-colors max-w-[140px] sm:max-w-none truncate"
           >
             <option value="uncategorized">Uncategorized</option>
             {categories?.map(c => (
@@ -289,7 +289,7 @@ export function NoteEditor() {
           </select>
         </div>
 
-        <div className="flex items-center space-x-4 text-stone-400">
+        <div className="flex items-center space-x-2 sm:space-x-4 text-stone-400">
           <button
             onClick={toggleFeatured}
             title="Feature this note"
@@ -326,13 +326,13 @@ export function NoteEditor() {
         className="flex-1 overflow-y-auto w-full custom-scrollbar cursor-text"
         onClick={handleContainerClick}
       >
-        <div className="max-w-5xl mx-auto px-8 py-12 flex flex-col gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-12 flex flex-col gap-4">
           <input
             type="text"
             value={localNote.title}
             onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
             placeholder="Note Title"
-            className="w-full text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-8 cursor-text"
+            className="w-full text-2xl sm:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-4 sm:mb-8 cursor-text"
           />
 
           <div className="flex-1 min-h-[500px] flex flex-col pb-32">
