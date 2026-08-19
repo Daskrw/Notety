@@ -126,24 +126,22 @@ export function RightPanel() {
     });
   };
 
-  if (!isRightPanelOpen) {
-    return null;
-  }
-
   const noteContent = parseNoteContent(localNote?.content || '');
 
   return (
     <aside 
       ref={panelRef}
       onMouseLeave={() => { if (!isRightPanelPinned) setRightPanelHovered(false); }}
-      className="w-96 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 shadow-xl z-40 shrink-0"
+      className={`w-96 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shadow-xl z-40 shrink-0 ${
+        isRightPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 -ml-96 pointer-events-none'
+      }`}
     >
       {/* Header */}
       <div className="h-16 px-5 flex items-center justify-between border-b border-stone-100 flex-shrink-0">
         <span className="text-xs font-heading font-semibold tracking-widest text-stone-500 uppercase">Panel</span>
         <button 
           onClick={toggleRightPanelPin} 
-          title={isRightPanelPinned ? "Pin active (click to enable hover peek)" : "Unpinned (hover to peek, click to pin)"}
+          title={isRightPanelPinned ? "Pin active (click to unpin)" : "Unpinned (click to pin)"}
           className={`p-1.5 rounded-md transition-colors ${isRightPanelPinned ? 'text-stone-500 hover:text-stone-800 hover:bg-stone-100' : 'text-amber-600 bg-amber-100/70 hover:bg-amber-200/80'}`}
         >
           {isRightPanelPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}

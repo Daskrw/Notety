@@ -232,35 +232,46 @@ export function NoteEditor() {
 
   const noteContent = parseNoteContent(localNote.content);
 
+  // Mouse hold handlers for sidebar toggle
+  const handleSidebarMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // only left click
+    if (!isSidebarPinned) {
+      setSidebarHovered(true);
+    }
+  };
+
+  const handleSidebarMouseUp = () => {
+    if (!isSidebarPinned) {
+      setSidebarHovered(false);
+    }
+  };
+
+  // Mouse hold handlers for right panel toggle
+  const handleRightPanelMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (!isRightPanelPinned) {
+      setRightPanelHovered(true);
+    }
+  };
+
+  const handleRightPanelMouseUp = () => {
+    if (!isRightPanelPinned) {
+      setRightPanelHovered(false);
+    }
+  };
+
   return (
     <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
-      {/* Left Edge Hover Peek Trigger Strip */}
-      {!isSidebarOpen && (
-        <div 
-          onMouseEnter={() => setSidebarHovered(true)}
-          className="absolute left-0 top-0 bottom-0 w-3 z-30 bg-transparent hover:bg-amber-400/20 cursor-pointer transition-colors"
-          title="Hover to peek sidebar"
-        />
-      )}
-
-      {/* Right Edge Hover Peek Trigger Strip */}
-      {!isRightPanelOpen && (
-        <div 
-          onMouseEnter={() => setRightPanelHovered(true)}
-          className="absolute right-0 top-0 bottom-0 w-3 z-30 bg-transparent hover:bg-amber-400/20 cursor-pointer transition-colors"
-          title="Hover to peek right panel"
-        />
-      )}
-
       {/* Top Toolbar */}
       <div className="h-16 flex items-center justify-between px-8 border-b border-stone-100 flex-shrink-0">
         <div className="flex items-center space-x-2">
           {!isSidebarOpen && (
             <button
-              onMouseEnter={() => setSidebarHovered(true)}
+              onMouseDown={handleSidebarMouseDown}
+              onMouseUp={handleSidebarMouseUp}
               onClick={toggleSidebarPin}
-              title="Hover to peek, click to pin sidebar"
-              className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-md transition-colors mr-1"
+              title="Hold mouse to preview, click to pin sidebar"
+              className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-md transition-colors mr-1 active:scale-95"
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -294,10 +305,11 @@ export function NoteEditor() {
           </button>
           {!isRightPanelOpen && (
             <button
-              onMouseEnter={() => setRightPanelHovered(true)}
+              onMouseDown={handleRightPanelMouseDown}
+              onMouseUp={handleRightPanelMouseUp}
               onClick={toggleRightPanelPin}
-              title="Hover to peek, click to pin right panel"
-              className="p-2 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors"
+              title="Hold mouse to preview, click to pin right panel"
+              className="p-2 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors active:scale-95"
             >
               <PanelRightOpen className="w-4 h-4" />
             </button>
