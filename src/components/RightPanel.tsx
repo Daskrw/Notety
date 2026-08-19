@@ -126,6 +126,57 @@ export function RightPanel() {
     });
   };
 
+  // Drag and drop reordering for existing blocks in RightPanel
+  const [draggedBlockIndex, setDraggedBlockIndex] = useState<number | null>(null);
+  const [dragOverBlockIndex, setDragOverBlockIndex] = useState<number | null>(null);
+
+  const handleBlockDragStart = (e: React.DragEvent, index: number) => {
+    const b = noteContent.blocks[index];
+    const val = 'value' in b ? b.value : '';
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      id: b.id,
+      type: b.type,
+      value: val
+    }));
+    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedBlockIndex(index);
+  };
+
+  const handleBlockDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverBlockIndex !== index) {
+      setDragOverBlockIndex(index);
+    }
+  };
+
+  const handleBlockDragLeave = () => {
+    setDragOverBlockIndex(null);
+  };
+
+  const handleBlockDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverBlockIndex(null);
+
+    if (draggedBlockIndex === null || draggedBlockIndex === targetIndex || !localNote) {
+      setDraggedBlockIndex(null);
+      return;
+    }
+
+    const currentBlocks = [...noteContent.blocks];
+    const [movedBlock] = currentBlocks.splice(draggedBlockIndex, 1);
+    currentBlocks.splice(targetIndex, 0, movedBlock);
+
+    setDraggedBlockIndex(null);
+
+    await db.notes.update(localNote.id, {
+      content: serializeNoteContent(noteContent.text, currentBlocks),
+      updated_at: Date.now()
+    });
+  };
+
   const noteContent = parseNoteContent(localNote?.content || '');
 
   return (
@@ -255,39 +306,58 @@ export function RightPanel() {
             </>
           ) : (
             /* Interactive Blocks list */
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-              {noteContent.blocks.map((block, index) => (
-                <div key={block.id} className="relative bg-white rounded-xl p-1 border border-stone-100 hover:border-stone-200 shadow-sm transition-all">
-                  {block.type === 'password' && (
-                    <PasswordBlockView 
-                      block={block}
-                      onChange={(val) => updateBlock(index, val)}
-                      onRemove={() => removeBlock(index)}
-                    />
-                  )}
-                  {block.type === 'ping' && (
-                    <PingBlockView 
-                      block={block}
-                      onChange={(val) => updateBlock(index, val)}
-                      onRemove={() => removeBlock(index)}
-                    />
-                  )}
-                  {block.type === 'job' && (
-                    <JobBlockView 
-                      block={block as any}
-                      onChange={(val) => updateBlock(index, val)}
-                      onRemove={() => removeBlock(index)}
-                    />
-                  )}
-                  {block.type === 'schedule' && (
-                    <ScheduleBlockView 
-                      block={block as any}
-                      onChange={(val) => updateBlock(index, val)}
-                      onRemove={() => removeBlock(index)}
-                    />
-                  )}
-                </div>
-              ))}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {noteContent.blocks.map((block, index) => {
+                const isBeingDragged = draggedBlockIndex === index;
+                const isDragOver = dragOverBlockIndex === index;
+
+                return (
+                  <div 
+                    key={block.id} 
+                    draggable
+                    onDragStart={(e) => handleBlockDragStart(e, index)}
+                    onDragOver={(e) => handleBlockDragOver(e, index)}
+                    onDragLeave={handleBlockDragLeave}
+                    onDrop={(e) => handleBlockDrop(e, index)}
+                    className={`relative bg-white rounded-xl p-1 border transition-all duration-150 cursor-grab active:cursor-grabbing ${
+                      isBeingDragged 
+                        ? 'opacity-40 scale-95 border-dashed border-stone-400' 
+                        : isDragOver
+                        ? 'border-blue-500 ring-2 ring-blue-300 ring-offset-1 shadow-md -translate-y-0.5'
+                        : 'border-stone-100 hover:border-stone-300 shadow-sm'
+                    }`}
+                  >
+                    {block.type === 'password' && (
+                      <PasswordBlockView 
+                        block={block}
+                        onChange={(val) => updateBlock(index, val)}
+                        onRemove={() => removeBlock(index)}
+                      />
+                    )}
+                    {block.type === 'ping' && (
+                      <PingBlockView 
+                        block={block}
+                        onChange={(val) => updateBlock(index, val)}
+                        onRemove={() => removeBlock(index)}
+                      />
+                    )}
+                    {block.type === 'job' && (
+                      <JobBlockView 
+                        block={block as any}
+                        onChange={(val) => updateBlock(index, val)}
+                        onRemove={() => removeBlock(index)}
+                      />
+                    )}
+                    {block.type === 'schedule' && (
+                      <ScheduleBlockView 
+                        block={block as any}
+                        onChange={(val) => updateBlock(index, val)}
+                        onRemove={() => removeBlock(index)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
               
               {noteContent.blocks.length === 0 && (
                 <p className="text-center text-stone-400 text-sm py-8 italic">No active blocks. Drag a block here from the toolbar to add it!</p>
