@@ -318,17 +318,15 @@ export function RightPanel() {
                 return (
                   <div 
                     key={block.id} 
-                    draggable
-                    onDragStart={(e) => handleBlockDragStart(e, index)}
                     onDragOver={(e) => handleBlockDragOver(e, index)}
                     onDragLeave={handleBlockDragLeave}
                     onDrop={(e) => handleBlockDrop(e, index)}
-                    className={`relative bg-white rounded-xl p-1 border transition-all duration-150 cursor-grab active:cursor-grabbing ${
+                    className={`relative bg-white rounded-xl p-1 border transition-all duration-150 ${
                       isBeingDragged 
                         ? 'opacity-40 scale-95 border-dashed border-stone-400' 
                         : isDragOver
                         ? 'border-blue-500 ring-2 ring-blue-300 ring-offset-1 shadow-md -translate-y-0.5'
-                        : 'border-stone-100 hover:border-stone-300 shadow-sm'
+                        : 'border-stone-100 hover:border-stone-200 shadow-sm'
                     }`}
                   >
                     {block.type === 'password' && (

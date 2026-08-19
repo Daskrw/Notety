@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, GripVertical, Radio } from 'lucide-react';
+import { Activity, GripVertical, Radio, Copy, Check } from 'lucide-react';
 import { PingBlock } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 
@@ -10,6 +10,8 @@ interface Props {
 }
 
 export function PingBlockView({ block, onChange, onRemove }: Props) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
   const { onMouseDown } = useDraggableBlock(
     { id: block.id, type: 'ping', value: block.value },
     '📡 Ping Signal'
@@ -49,9 +51,19 @@ export function PingBlockView({ block, onChange, onRemove }: Props) {
     return `11${a}.1${b}${c}.1${d}${e}.111 : 6100`;
   };
 
+  const handleCopy = (text: string, key: string) => {
+    if (!text || text.includes('Awaiting')) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1500);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
   };
+
+  const signalText = getSignal(block.value);
+  const nssSignalText = getNssSignal(block.value);
 
   return (
     <div className="group relative flex flex-col bg-green-50/70 border border-green-200 rounded-lg overflow-hidden my-1.5 w-full shadow-sm transition-all hover:border-green-300">
@@ -71,7 +83,7 @@ export function PingBlockView({ block, onChange, onRemove }: Props) {
           value={block.value || ''}
           onChange={handleInputChange}
           placeholder="Enter ping code / text..."
-          className="flex-1 px-2 py-1 bg-transparent outline-none text-green-900 text-xs font-mono placeholder:text-green-400 font-medium"
+          className="flex-1 px-2 py-1 bg-transparent outline-none text-green-900 text-xs font-mono placeholder:text-green-400 font-medium select-text"
         />
         <button 
           onClick={onRemove}
@@ -89,7 +101,14 @@ export function PingBlockView({ block, onChange, onRemove }: Props) {
             <Radio size={11} className="text-green-600" />
             Signal:
           </span>
-          <span className="truncate">{getSignal(block.value)}</span>
+          <span className="truncate select-text cursor-text font-mono text-xs">{signalText}</span>
+          <button
+            onClick={() => handleCopy(signalText, 'signal')}
+            title="Copy Signal"
+            className="p-1 text-stone-400 hover:text-green-700 rounded transition-colors shrink-0"
+          >
+            {copiedKey === 'signal' ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+          </button>
         </div>
 
         {/* NSS Signal */}
@@ -98,7 +117,14 @@ export function PingBlockView({ block, onChange, onRemove }: Props) {
             <Radio size={11} className="text-emerald-600" />
             NSS:
           </span>
-          <span className="truncate">{getNssSignal(block.value)}</span>
+          <span className="truncate select-text cursor-text font-mono text-xs">{nssSignalText}</span>
+          <button
+            onClick={() => handleCopy(nssSignalText, 'nss')}
+            title="Copy NSS Signal"
+            className="p-1 text-stone-400 hover:text-emerald-700 rounded transition-colors shrink-0"
+          >
+            {copiedKey === 'nss' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+          </button>
         </div>
       </div>
     </div>
