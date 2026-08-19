@@ -78,11 +78,11 @@ export function HighlightModal() {
               autoFocus
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full h-full min-h-[420px] resize-none border-none outline-none text-stone-800 text-base leading-relaxed bg-transparent font-sans"
+              className="w-full h-full min-h-[420px] resize-none border-none outline-none text-stone-800 text-base leading-relaxed bg-transparent font-sans whitespace-pre-wrap break-words"
               placeholder="Write your highlight content here in markdown..."
             />
           ) : (
-            <div className="prose prose-stone prose-base max-w-none text-stone-800 leading-relaxed">
+            <div className="prose prose-stone prose-base max-w-none text-stone-800 leading-relaxed whitespace-pre-wrap break-words">
               {highlight?.content ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {highlight.content}
