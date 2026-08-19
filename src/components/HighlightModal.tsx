@@ -48,18 +48,18 @@ export function HighlightModal() {
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between px-8 py-5 border-b border-stone-100 bg-stone-50/50">
-          <h3 className="text-lg font-heading font-semibold text-stone-800">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] border border-stone-100">
+        <div className="flex items-center justify-between px-8 py-5 border-b border-stone-100 bg-stone-50/70">
+          <h3 className="text-xl font-heading font-semibold text-stone-800 tracking-tight">
             {highlight?.name || 'Important Highlight'}
           </h3>
           <div className="flex items-center gap-3">
             {isEditing ? (
-              <button onClick={saveContent} className="text-xs font-medium bg-stone-900 text-white px-3 py-1.5 rounded hover:bg-stone-800 transition-colors">
-                Save
+              <button onClick={saveContent} className="text-xs font-semibold bg-stone-900 text-white px-4 py-2 rounded-lg hover:bg-stone-800 transition-colors shadow-xs">
+                Save Changes
               </button>
             ) : (
-              <button onClick={() => setIsEditing(true)} className="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">
+              <button onClick={() => setIsEditing(true)} className="text-xs font-medium text-stone-600 bg-white border border-stone-200 hover:bg-stone-100 px-3.5 py-1.5 rounded-lg transition-colors shadow-2xs">
                 Edit
               </button>
             )}
@@ -72,23 +72,23 @@ export function HighlightModal() {
           </div>
         </div>
         
-        <div className="p-8 overflow-y-auto flex-1 font-sans">
+        <div className="p-8 sm:p-10 overflow-y-auto flex-1 font-sans custom-scrollbar">
           {isEditing ? (
             <textarea
               autoFocus
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full h-full min-h-[300px] resize-none border-none outline-none text-stone-700 leading-relaxed bg-transparent"
+              className="w-full h-full min-h-[420px] resize-none border-none outline-none text-stone-800 text-base leading-relaxed bg-transparent font-sans"
               placeholder="Write your highlight content here in markdown..."
             />
           ) : (
-            <div className="prose prose-stone max-w-none text-stone-700">
+            <div className="prose prose-stone prose-base max-w-none text-stone-800 leading-relaxed">
               {highlight?.content ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {highlight.content}
                 </ReactMarkdown>
               ) : (
-                <p className="text-stone-400 italic">No content saved for this highlight. Click Edit to add some.</p>
+                <p className="text-stone-400 italic text-base">No content saved for this highlight. Click Edit to add some.</p>
               )}
             </div>
           )}
