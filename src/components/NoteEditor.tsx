@@ -265,13 +265,14 @@ export function NoteEditor() {
       {/* Top Toolbar */}
       <div className="h-16 flex items-center justify-between px-8 border-b border-stone-100 flex-shrink-0">
         <div className="flex items-center space-x-2">
-          {!isSidebarOpen && (
+          {!isSidebarPinned && (
             <button
+              onMouseEnter={() => setSidebarHovered(true)}
               onMouseDown={handleSidebarMouseDown}
               onMouseUp={handleSidebarMouseUp}
               onClick={toggleSidebarPin}
-              title="Hold mouse to preview, click to pin sidebar"
-              className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-md transition-colors mr-1 active:scale-95"
+              title="Hover/hold to preview, click to pin sidebar"
+              className="p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-md transition-all mr-1 shadow-xs active:scale-95 cursor-pointer"
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -303,13 +304,14 @@ export function NoteEditor() {
           >
             <Trash2 className="w-4 h-4" />
           </button>
-          {!isRightPanelOpen && (
+          {!isRightPanelPinned && (
             <button
+              onMouseEnter={() => setRightPanelHovered(true)}
               onMouseDown={handleRightPanelMouseDown}
               onMouseUp={handleRightPanelMouseUp}
               onClick={toggleRightPanelPin}
-              title="Hold mouse to preview, click to pin right panel"
-              className="p-2 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors active:scale-95"
+              title="Hover/hold to preview, click to pin right panel"
+              className="p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-md transition-all shadow-xs active:scale-95 cursor-pointer"
             >
               <PanelRightOpen className="w-4 h-4" />
             </button>
