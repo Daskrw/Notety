@@ -222,10 +222,31 @@ export function NoteEditor() {
     }
   };
 
+  // Auto select first note if none selected
+  const allNotes = useLiveQuery(() => db.notes.toArray());
+  useEffect(() => {
+    if (!selectedNoteId && allNotes && allNotes.length > 0) {
+      const sorted = [...allNotes].sort((a, b) => b.updated_at - a.updated_at);
+      setSelectedNoteId(sorted[0].id);
+    }
+  }, [selectedNoteId, allNotes, setSelectedNoteId]);
+
   if (!selectedNoteId || !localNote) {
     return (
-      <div className="flex-1 flex items-center justify-center text-stone-400 bg-white">
-        <p className="text-sm font-medium tracking-wide">Select a note to start writing</p>
+      <div className="flex-1 flex flex-col h-screen bg-white">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-stone-100 flex-shrink-0">
+          <button
+            onClick={toggleSidebarPin}
+            title="Open Sidebar"
+            className="p-2 text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium"
+          >
+            <Menu className="w-4 h-4" />
+            <span>Open Notes</span>
+          </button>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-stone-400 gap-3">
+          <p className="text-sm font-medium tracking-wide">Select a note to start writing</p>
+        </div>
       </div>
     );
   }
