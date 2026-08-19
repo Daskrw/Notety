@@ -319,47 +319,49 @@ export function NoteEditor() {
         </div>
       </div>
 
-      {/* Editor Content */}
+      {/* Editor Content Scroll Container */}
       <div 
         key={selectedNoteId}
         ref={editorRef}
-        className="flex-1 overflow-y-auto px-8 py-12 w-full max-w-5xl mx-auto flex flex-col gap-4 custom-scrollbar cursor-text"
+        className="flex-1 overflow-y-auto w-full custom-scrollbar cursor-text"
         onClick={handleContainerClick}
       >
-        <input
-          type="text"
-          value={localNote.title}
-          onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
-          placeholder="Note Title"
-          className="w-full text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-8 cursor-text"
-        />
-
-        <div className="flex-1 min-h-[500px] flex flex-col pb-32">
-          <TextareaAutosize
-            ref={textareaRef}
-            value={noteContent.text}
-            onChange={(e) => {
-              setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
-            }}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePasteImage}
-            placeholder="Start writing..."
-            className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans custom-scrollbar"
-            minRows={10}
+        <div className="max-w-5xl mx-auto px-8 py-12 flex flex-col gap-4">
+          <input
+            type="text"
+            value={localNote.title}
+            onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
+            placeholder="Note Title"
+            className="w-full text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-8 cursor-text"
           />
 
-          {/* Centered Image Blocks (MS Word Style) */}
-          {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
-            const imgBlock = block as ImageBlock;
-            return (
-              <ImageBlockView
-                key={imgBlock.id}
-                block={imgBlock}
-                onChange={(caption) => updateImageCaption(imgBlock.id, caption)}
-                onRemove={() => removeImageBlock(imgBlock.id)}
-              />
-            );
-          })}
+          <div className="flex-1 min-h-[500px] flex flex-col pb-32">
+            <TextareaAutosize
+              ref={textareaRef}
+              value={noteContent.text}
+              onChange={(e) => {
+                setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
+              }}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePasteImage}
+              placeholder="Start writing..."
+              className="w-full min-h-[300px] resize-none overflow-hidden bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans"
+              minRows={10}
+            />
+
+            {/* Centered Image Blocks (MS Word Style) */}
+            {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
+              const imgBlock = block as ImageBlock;
+              return (
+                <ImageBlockView
+                  key={imgBlock.id}
+                  block={imgBlock}
+                  onChange={(caption) => updateImageCaption(imgBlock.id, caption)}
+                  onRemove={() => removeImageBlock(imgBlock.id)}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
       
