@@ -49,7 +49,8 @@ export function RightPanel() {
       const note = await db.notes.get(noteId);
       if (!note) return;
 
-      const noteContent = parseNoteContent(note.content);
+      const tripParsed = parseTripToGoContent(note.content);
+      const noteContent = parseNoteContent(tripParsed.text);
       const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id);
 
       // If it's an existing block already in the note, do not duplicate
@@ -64,9 +65,13 @@ export function RightPanel() {
       };
 
       const newBlocks = [...noteContent.blocks, droppedBlock];
+      const baseContent = serializeNoteContent(noteContent.text, newBlocks);
+      const finalContent = isTripToGoContent(note.content)
+        ? serializeTripToGoContent(baseContent, tripParsed.data)
+        : baseContent;
 
       await db.notes.update(noteId, {
-        content: serializeNoteContent(noteContent.text, newBlocks),
+        content: finalContent,
         updated_at: Date.now()
       });
       
@@ -106,28 +111,42 @@ export function RightPanel() {
 
   const updateBlock = async (index: number, val: any) => {
     if (!localNote || !user) return;
-    const noteContent = parseNoteContent(localNote.content);
+    const tripParsed = parseTripToGoContent(localNote.content);
+    const noteContent = parseNoteContent(tripParsed.text);
     const newBlocks = [...noteContent.blocks];
     const current = newBlocks[index];
+    if (!current) return;
+
     if (current.type === 'image') {
       newBlocks[index] = { ...current, caption: val };
     } else {
       newBlocks[index] = { ...current, value: val } as any;
     }
     
+    const baseContent = serializeNoteContent(noteContent.text, newBlocks);
+    const finalContent = isTripToGoContent(localNote.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(localNote.id, {
-      content: serializeNoteContent(noteContent.text, newBlocks),
+      content: finalContent,
       updated_at: Date.now()
     });
   };
 
   const removeBlock = async (index: number) => {
     if (!localNote || !user) return;
-    const noteContent = parseNoteContent(localNote.content);
+    const tripParsed = parseTripToGoContent(localNote.content);
+    const noteContent = parseNoteContent(tripParsed.text);
     const newBlocks = noteContent.blocks.filter((_, i) => i !== index);
 
+    const baseContent = serializeNoteContent(noteContent.text, newBlocks);
+    const finalContent = isTripToGoContent(localNote.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(localNote.id, {
-      content: serializeNoteContent(noteContent.text, newBlocks),
+      content: finalContent,
       updated_at: Date.now()
     });
   };
