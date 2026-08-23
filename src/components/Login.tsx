@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Lock, User, Eye, EyeOff, BookOpen } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../store/useStore';
 
 type Tab = 'login' | 'register';
 
@@ -23,7 +24,7 @@ export function Login() {
     if (!username.trim() || !password) return;
     setLoading(true);
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email(username),
         password,
       });
@@ -32,6 +33,8 @@ export function Login() {
           ? 'Incorrect username or password.'
           : signInError.message
         );
+      } else if (data?.user) {
+        useAuthStore.getState().setUser(data.user);
       }
     } catch {
       setError('A network error occurred. Please try again.');
@@ -50,7 +53,7 @@ export function Login() {
 
     setLoading(true);
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: email(username),
         password,
         options: {
@@ -66,6 +69,8 @@ export function Login() {
           ? 'That username is already taken. Please choose another.'
           : signUpError.message
         );
+      } else if (data?.user) {
+        useAuthStore.getState().setUser(data.user);
       }
     } catch {
       setError('A network error occurred. Please try again.');
