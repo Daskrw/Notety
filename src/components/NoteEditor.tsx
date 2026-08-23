@@ -44,12 +44,40 @@ export function NoteEditor() {
   useEffect(() => {
     if (!selectedNoteId) {
       setLocalNote(null);
-    } else if (dbNote) {
-      if (dbNote.id !== localNote?.id) {
-        setLocalNote(dbNote);
+      return;
+    }
+    if (!dbNote) return;
+
+    // First load or note switch — take dbNote wholesale
+    if (dbNote.id !== localNote?.id) {
+      setLocalNote(dbNote);
+      return;
+    }
+
+    // Same note — check if blocks were modified externally (by RightPanel/BlocksTab)
+    // We need to merge external block changes into localNote to prevent auto-save from overwriting them
+    if (localNote && dbNote.content !== localNote.content) {
+      // Parse blocks from both sources
+      const dbTripParsed = parseTripToGoContent(dbNote.content);
+      const dbParsed = parseNoteContent(dbTripParsed.text);
+      const localTripParsed = parseTripToGoContent(localNote.content);
+      const localParsed = parseNoteContent(localTripParsed.text);
+
+      // Check if blocks changed but text didn't (external block mutation)
+      const dbBlocksJson = JSON.stringify(dbParsed.blocks);
+      const localBlocksJson = JSON.stringify(localParsed.blocks);
+      
+      if (dbBlocksJson !== localBlocksJson) {
+        // Merge: keep local text, take db blocks
+        const mergedBase = serializeNoteContent(localParsed.text, dbParsed.blocks);
+        const mergedContent = isTripToGoContent(localNote.content)
+          ? serializeTripToGoContent(mergedBase, localTripParsed.data)
+          : mergedBase;
+        setLocalNote({ ...localNote, content: mergedContent });
       }
     }
-  }, [selectedNoteId, dbNote?.id]); // Only switch when note ID changes, avoiding clobbering active edits
+  }, [selectedNoteId, dbNote]);
+
 
   useAutoSave(localNote, 400); // Responsive debounce save (400ms)
 
