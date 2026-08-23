@@ -5,11 +5,13 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu, FileText, Map } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { ImageBlockView } from './ImageBlockView';
+import { TripToGoView } from './TripToGoView';
+import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent, TripToGoData } from '@/lib/triptogo';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 export function NoteEditor() {
@@ -37,7 +39,7 @@ export function NoteEditor() {
     } else if (dbNote) {
       if (dbNote.id !== localNote?.id) {
         setLocalNote(dbNote);
-      } else {
+      } else if (!isTripToGoContent(dbNote.content)) {
         const localParsed = parseNoteContent(localNote.content);
         const dbParsed = parseNoteContent(dbNote.content);
         if (JSON.stringify(localParsed.blocks) !== JSON.stringify(dbParsed.blocks)) {
@@ -55,43 +57,43 @@ export function NoteEditor() {
   const localNoteRef = useRef(localNote);
   localNoteRef.current = localNote;
 
-  // Pointer-based drop: register a global listener that fires when a block is dropped
   useEffect(() => {
     const unregister = registerDropListener((payload: DragBlockPayload, x: number, y: number) => {
       const current = localNoteRef.current;
-      if (!current) return;
+      if (!current || !editorRef.current) return;
 
-      const noteContent = parseNoteContent(current.content);
+      const rect = editorRef.current.getBoundingClientRect();
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
 
-      // Give the block a fresh UUID when coming from the template
+      const parsed = parseNoteContent(current.content);
       const droppedBlock: EditorBlock = {
-        id: ['template-password', 'template-ping'].includes(payload.id)
+        id: ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id)
           ? crypto.randomUUID()
           : payload.id,
         type: payload.type,
         value: payload.value,
       };
 
-      const newBlocks = [...noteContent.blocks];
-      const existingIndex = newBlocks.findIndex(b => b.id === droppedBlock.id);
-
-      if (existingIndex !== -1) {
-        newBlocks[existingIndex] = droppedBlock;
-      } else {
-        newBlocks.push(droppedBlock);
-      }
-
+      const newBlocks = [...parsed.blocks, droppedBlock];
       setLocalNote({
         ...current,
-        content: serializeNoteContent(noteContent.text, newBlocks)
+        content: serializeNoteContent(parsed.text, newBlocks),
       });
-      // Automatically open side panel so user sees the block was added
       if (!isRightPanelOpen) {
         toggleRightPanel();
       }
     });
-    return unregister;
+
+    return () => unregister();
   }, [isRightPanelOpen, toggleRightPanel]);
+
+  const updateCategory = async (categoryId: string) => {
+    if (!localNote || !user) return;
+    const catId = categoryId === 'uncategorized' ? undefined : categoryId;
+    const updated = { ...localNote, category_id: catId };
+    setLocalNote(updated);
+    await updateNote(localNote.id, user.id, { category_id: catId });
+  };
 
   const toggleFeatured = async () => {
     if (!localNote || !user) return;
@@ -100,69 +102,10 @@ export function NoteEditor() {
     await updateNote(localNote.id, user.id, { is_featured: updated.is_featured });
   };
 
-  const updateCategory = async (catId: string) => {
-    if (!localNote || !user) return;
-    const newCatId = catId === 'uncategorized' ? undefined : catId;
-    const updated = { ...localNote, category_id: newCatId };
-    setLocalNote(updated);
-    await updateNote(localNote.id, user.id, { category_id: newCatId });
-  };
-
   const handleDeleteNote = async () => {
     if (!localNote || !user) return;
     await deleteNote(localNote.id, user.id);
     setSelectedNoteId(null);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const triggerKey = userProfile?.shortcut_trigger_key || 'Tab';
-    const prefix = userProfile?.shortcut_prefix ?? '!';
-    
-    if (e.key === triggerKey) {
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      
-      // If there's a selection, default behavior
-      if (start !== end) return;
-
-      const noteContent = parseNoteContent(localNote!.content);
-      const text = noteContent.text;
-      const textBeforeCursor = text.substring(0, start);
-      
-      const words = textBeforeCursor.split(/\s+/);
-      const lastWord = words[words.length - 1];
-
-      if (lastWord) {
-        let potentialShortcut = lastWord;
-        let lastPrefixIndex = prefix ? lastWord.lastIndexOf(prefix) : 0;
-        
-        if (prefix === '') {
-          potentialShortcut = lastWord;
-        } else if (lastPrefixIndex !== -1) {
-          potentialShortcut = lastWord.substring(lastPrefixIndex + prefix.length);
-        } else {
-          return;
-        }
-        
-        const snippet = snippets?.find(s => s.shortcut === potentialShortcut);
-        
-        if (snippet) {
-          e.preventDefault();
-          const prefixIncluded = prefix + potentialShortcut;
-          const contentBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - prefixIncluded.length);
-          const textAfterCursor = text.substring(start);
-          const newText = contentBeforeWord + snippet.content + textAfterCursor;
-          
-          setLocalNote({ ...localNote!, content: serializeNoteContent(newText, noteContent.blocks) });
-          
-          setTimeout(() => {
-            const newCursorPos = contentBeforeWord.length + snippet.content.length;
-            target.setSelectionRange(newCursorPos, newCursorPos);
-          }, 0);
-        }
-      }
-    }
   };
 
   const updateImageCaption = (id: string, caption: string) => {
@@ -174,23 +117,59 @@ export function NoteEditor() {
       }
       return b;
     });
-    setLocalNote({ ...localNote, content: serializeNoteContent(content.text, newBlocks) });
+    setLocalNote({
+      ...localNote,
+      content: serializeNoteContent(content.text, newBlocks)
+    });
   };
 
   const removeImageBlock = (id: string) => {
     if (!localNote) return;
     const content = parseNoteContent(localNote.content);
     const newBlocks = content.blocks.filter(b => b.id !== id);
-    setLocalNote({ ...localNote, content: serializeNoteContent(content.text, newBlocks) });
+    setLocalNote({
+      ...localNote,
+      content: serializeNoteContent(content.text, newBlocks)
+    });
   };
 
-  const handlePasteImage = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file && localNote) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === (userProfile?.shortcut_trigger_key || ' ') || e.key === 'Tab') {
+      const textarea = e.currentTarget;
+      const text = textarea.value;
+      const cursor = textarea.selectionStart;
+      const prefix = userProfile?.shortcut_prefix || '::';
+
+      const match = text.slice(0, cursor).match(new RegExp(`${prefix}(\\w+)$`));
+
+      if (match) {
+        const keyword = match[1];
+        const snippet = snippets?.find(s => s.shortcut === keyword);
+
+        if (snippet) {
           e.preventDefault();
+          const start = cursor - match[0].length;
+          const newText = text.slice(0, start) + snippet.content + text.slice(cursor);
+          const parsed = parseNoteContent(localNote?.content || '');
+          setLocalNote({ ...localNote!, content: serializeNoteContent(newText, parsed.blocks) });
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + snippet.content.length;
+          }, 0);
+        }
+      }
+    }
+  };
+
+  const handlePasteImage = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items || !localNote) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
           const reader = new FileReader();
           reader.onload = (ev) => {
             const dataUrl = ev.target?.result as string;
@@ -216,13 +195,10 @@ export function NoteEditor() {
 
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-      }
+      textareaRef.current?.focus();
     }
   };
 
-  // Auto select first note if none selected
   const allNotes = useLiveQuery(() => db.notes.toArray());
   useEffect(() => {
     if (!selectedNoteId && allNotes && allNotes.length > 0) {
@@ -235,11 +211,7 @@ export function NoteEditor() {
     return (
       <div className="flex-1 flex flex-col h-screen bg-white">
         <div className="h-16 flex items-center justify-between px-4 border-b border-stone-100 flex-shrink-0">
-          <button
-            onClick={toggleSidebarPin}
-            title="Open Sidebar"
-            className="p-2 text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium"
-          >
+          <button onClick={toggleSidebarPin} className="p-2 text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium">
             <Menu className="w-4 h-4" />
             <span>Open Notes</span>
           </button>
@@ -251,39 +223,43 @@ export function NoteEditor() {
     );
   }
 
+  const isTripMode = isTripToGoContent(localNote.content);
   const noteContent = parseNoteContent(localNote.content);
+  const tripParsed = parseTripToGoContent(localNote.content);
 
-  // Mouse hold handlers for sidebar toggle
-  const handleSidebarMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // only left click
-    if (!isSidebarPinned) {
-      setSidebarHovered(true);
+  const handleToggleMode = (mode: 'standard' | 'triptogo') => {
+    if (mode === 'triptogo' && !isTripMode) {
+      const serialized = serializeTripToGoContent(noteContent.text, tripParsed.data);
+      setLocalNote({ ...localNote, content: serialized });
+    } else if (mode === 'standard' && isTripMode) {
+      const regularText = tripParsed.text;
+      setLocalNote({ ...localNote, content: regularText });
     }
+  };
+
+  const handleTripDataChange = (newData: TripToGoData) => {
+    const serialized = serializeTripToGoContent(tripParsed.text, newData);
+    setLocalNote({ ...localNote, content: serialized });
+  };
+
+  const handleSidebarMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0 && !isSidebarPinned) setSidebarHovered(true);
   };
 
   const handleSidebarMouseUp = () => {
-    if (!isSidebarPinned) {
-      setSidebarHovered(false);
-    }
+    if (!isSidebarPinned) setSidebarHovered(false);
   };
 
-  // Mouse hold handlers for right panel toggle
   const handleRightPanelMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    if (!isRightPanelPinned) {
-      setRightPanelHovered(true);
-    }
+    if (e.button === 0 && !isRightPanelPinned) setRightPanelHovered(true);
   };
 
   const handleRightPanelMouseUp = () => {
-    if (!isRightPanelPinned) {
-      setRightPanelHovered(false);
-    }
+    if (!isRightPanelPinned) setRightPanelHovered(false);
   };
 
   return (
     <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
-      {/* Top Toolbar */}
       <div className="h-16 flex items-center justify-between px-3 sm:px-8 border-b border-stone-100 flex-shrink-0">
         <div className="flex items-center space-x-2">
           {!isSidebarPinned && (
@@ -292,7 +268,6 @@ export function NoteEditor() {
               onMouseDown={handleSidebarMouseDown}
               onMouseUp={handleSidebarMouseUp}
               onClick={toggleSidebarPin}
-              title="Hover/hold to preview, click to pin sidebar"
               className="p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-md transition-all mr-1 shadow-xs active:scale-95 cursor-pointer"
             >
               <Menu className="w-4 h-4" />
@@ -301,26 +276,51 @@ export function NoteEditor() {
           <select
             value={localNote.category_id || 'uncategorized'}
             onChange={(e) => updateCategory(e.target.value)}
-            className="text-xs font-medium text-stone-500 bg-transparent outline-none cursor-pointer hover:text-stone-800 transition-colors max-w-[140px] sm:max-w-none truncate"
+            className="text-xs font-medium text-stone-500 bg-transparent outline-none cursor-pointer hover:text-stone-800 transition-colors max-w-[120px] sm:max-w-none truncate"
           >
             <option value="uncategorized">Uncategorized</option>
             {categories?.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+
+          <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200/60 ml-2">
+            <button
+              onClick={() => handleToggleMode('standard')}
+              title="Standard Note Mode"
+              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
+                !isTripMode 
+                  ? 'bg-white text-stone-900 shadow-2xs' 
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              <FileText size={12} />
+              <span className="hidden sm:inline">Note</span>
+            </button>
+            <button
+              onClick={() => handleToggleMode('triptogo')}
+              title="TripToGo Flowchart Mode"
+              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
+                isTripMode 
+                  ? 'bg-amber-500 text-white shadow-2xs font-semibold' 
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              <Map size={12} />
+              <span>TripToGo</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-4 text-stone-400">
           <button
             onClick={toggleFeatured}
-            title="Feature this note"
             className={`p-2 rounded-full transition-colors ${localNote.is_featured ? 'text-amber-500 bg-amber-50' : 'hover:bg-stone-100'}`}
           >
             <Star className={`w-4 h-4 ${localNote.is_featured ? 'fill-amber-500' : ''}`} />
           </button>
           <button
             onClick={handleDeleteNote}
-            title="Delete note"
             className="p-2 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
@@ -331,7 +331,6 @@ export function NoteEditor() {
               onMouseDown={handleRightPanelMouseDown}
               onMouseUp={handleRightPanelMouseUp}
               onClick={toggleRightPanelPin}
-              title="Hover/hold to preview, click to pin right panel"
               className="p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-md transition-all shadow-xs active:scale-95 cursor-pointer"
             >
               <PanelRightOpen className="w-4 h-4" />
@@ -340,54 +339,69 @@ export function NoteEditor() {
         </div>
       </div>
 
-      {/* Editor Content Scroll Container */}
-      <div 
-        key={selectedNoteId}
-        ref={editorRef}
-        className="flex-1 overflow-y-auto w-full custom-scrollbar cursor-text"
-        onClick={handleContainerClick}
-      >
-        <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-12 flex flex-col gap-4">
-          <input
-            type="text"
-            value={localNote.title}
-            onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
-            placeholder="Note Title"
-            className="w-full text-2xl sm:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-4 sm:mb-8 cursor-text"
+      {isTripMode ? (
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-stone-50/40">
+          <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-6">
+            <input
+              type="text"
+              value={localNote.title}
+              onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
+              placeholder="Trip Title (e.g. Tokyo 5 Days Itinerary)"
+              className="w-full text-2xl sm:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
+            />
+          </div>
+          <TripToGoView
+            data={tripParsed.data}
+            onChange={handleTripDataChange}
           />
-
-          <div className="flex-1 min-h-[500px] flex flex-col pb-32">
-            <TextareaAutosize
-              ref={textareaRef}
-              value={noteContent.text}
-              onChange={(e) => {
-                setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
-              }}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePasteImage}
-              placeholder="Start writing..."
-              className="w-full min-h-[300px] resize-none overflow-hidden bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans"
-              minRows={10}
+        </div>
+      ) : (
+        <div 
+          key={selectedNoteId}
+          ref={editorRef}
+          className="flex-1 overflow-y-auto w-full custom-scrollbar cursor-text"
+          onClick={handleContainerClick}
+        >
+          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-12 flex flex-col gap-4">
+            <input
+              type="text"
+              value={localNote.title}
+              onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
+              placeholder="Note Title"
+              className="w-full text-2xl sm:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-4 sm:mb-8 cursor-text"
             />
 
-            {/* Centered Image Blocks (MS Word Style) */}
-            {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
-              const imgBlock = block as ImageBlock;
-              return (
-                <ImageBlockView
-                  key={imgBlock.id}
-                  block={imgBlock}
-                  onChange={(caption) => updateImageCaption(imgBlock.id, caption)}
-                  onRemove={() => removeImageBlock(imgBlock.id)}
-                />
-              );
-            })}
+            <div className="flex-1 min-h-[500px] flex flex-col pb-32">
+              <TextareaAutosize
+                ref={textareaRef}
+                value={noteContent.text}
+                onChange={(e) => {
+                  setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
+                }}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePasteImage}
+                placeholder="Start writing..."
+                className="w-full min-h-[300px] resize-none overflow-hidden bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans"
+                minRows={10}
+              />
+
+              {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
+                const imgBlock = block as ImageBlock;
+                return (
+                  <ImageBlockView
+                    key={imgBlock.id}
+                    block={imgBlock}
+                    onChange={(caption) => updateImageCaption(imgBlock.id, caption)}
+                    onRemove={() => removeImageBlock(imgBlock.id)}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
-      {/* Blocks Toolbar */}
-      <BlocksTab />
+      {!isTripMode && <BlocksTab />}
     </div>
   );
 }
