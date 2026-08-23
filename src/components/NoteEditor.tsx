@@ -253,8 +253,9 @@ export function NoteEditor() {
 
   const handleNoteTextChange = (newText: string) => {
     if (!localNote) return;
+    const isTrip = isTripToGoContent(localNote.content) || viewMode === 'triptogo';
     const baseContent = serializeNoteContent(newText, noteContent.blocks);
-    const serialized = isTripToGoContent(localNote.content) || viewMode === 'triptogo'
+    const serialized = isTrip
       ? serializeTripToGoContent(baseContent, tripParsed.data)
       : baseContent;
       
@@ -263,7 +264,6 @@ export function NoteEditor() {
 
   const handleTripDataChange = (newData: TripToGoData) => {
     if (!localNote) return;
-    // Always preserve the current note blocks and text
     const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
     const serialized = serializeTripToGoContent(baseContent, newData);
     const updated = { ...localNote, content: serialized };

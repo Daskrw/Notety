@@ -69,27 +69,36 @@ export interface NoteContent {
 
 export function parseNoteContent(content: string): NoteContent {
   if (!content) return { text: '', blocks: [] };
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object') {
-      if ('text' in parsed || 'blocks' in parsed) {
-        return {
-          text: parsed.text || '',
-          blocks: Array.isArray(parsed.blocks) ? parsed.blocks : []
-        };
+  
+  let current = content;
+  let collectedBlocks: EditorBlock[] = [];
+
+  // Repeatedly unwrap in case of legacy nested JSON stringification
+  for (let i = 0; i < 5; i++) {
+    try {
+      const parsed = JSON.parse(current);
+      if (parsed && typeof parsed === 'object') {
+        if ('text' in parsed || 'blocks' in parsed) {
+          if (Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
+            collectedBlocks = parsed.blocks;
+          }
+          current = parsed.text || '';
+          continue;
+        }
+        if (Array.isArray(parsed)) {
+          const textBlocks = parsed.filter(b => b.type === 'text');
+          current = textBlocks.map(b => b.value).join('\n');
+          collectedBlocks = parsed.filter(b => b.type !== 'text');
+          break;
+        }
       }
-      // If it's a legacy JSON block array
-      if (Array.isArray(parsed)) {
-        const textBlocks = parsed.filter(b => b.type === 'text');
-        const text = textBlocks.map(b => b.value).join('\n');
-        const otherBlocks = parsed.filter(b => b.type !== 'text');
-        return { text, blocks: otherBlocks };
-      }
+      break;
+    } catch {
+      break;
     }
-  } catch (e) {
-    // Legacy plain text note
   }
-  return { text: content, blocks: [] };
+
+  return { text: current, blocks: collectedBlocks };
 }
 
 export function serializeNoteContent(text: string, blocks: EditorBlock[]): string {
