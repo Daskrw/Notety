@@ -235,7 +235,7 @@ export function TripToGoView({ data, onChange }: Props) {
 
                     {/* Place Name and Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="text-sm font-semibold">{catStyle.icon}</span>
                         <input
                           type="text"
@@ -260,6 +260,35 @@ export function TripToGoView({ data, onChange }: Props) {
                           <option value="shopping">🛍️ Shopping</option>
                           <option value="other">📍 Other</option>
                         </select>
+                      </div>
+
+                      {/* Check-In Sub-Heading & Checkbox Row */}
+                      <div className="flex items-center gap-2 my-1.5 bg-white/60 border border-stone-200/60 hover:border-amber-300/80 rounded-lg px-2.5 py-1 transition-all">
+                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={!!node.isCheckedIn}
+                            onChange={(e) => handleUpdateNode(node.id, { isCheckedIn: e.target.checked })}
+                            className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-stone-300 accent-amber-600 cursor-pointer"
+                          />
+                          <span className={`text-[11px] font-medium transition-colors ${node.isCheckedIn ? 'text-amber-700 font-semibold' : 'text-stone-500'}`}>
+                            📍 Check-in:
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={node.checkInSubHeading || ''}
+                          onChange={(e) => handleUpdateNode(node.id, { checkInSubHeading: e.target.value })}
+                          placeholder="Sub-heading e.g. Gate 4, Lobby desk, Spot #A..."
+                          className={`flex-1 text-xs bg-transparent outline-none placeholder:text-stone-400 font-medium ${
+                            node.isCheckedIn ? 'text-amber-900' : 'text-stone-600'
+                          }`}
+                        />
+                        {node.isCheckedIn && (
+                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-300 shrink-0">
+                            Checked In
+                          </span>
+                        )}
                       </div>
 
                       {/* Time Range and Note Inputs */}

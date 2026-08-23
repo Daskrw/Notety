@@ -3,6 +3,8 @@ export type TransportType = 'walk' | 'train' | 'car' | 'bus' | 'flight' | 'ferry
 export interface TripLocationNode {
   id: string;
   name: string;
+  checkInSubHeading?: string; // e.g. "Check-in: Counter 4 / Terminal 2" or hotel room
+  isCheckedIn?: boolean;
   timeStart: string; // e.g. '09:00'
   timeEnd: string;   // e.g. '11:30'
   isVisited: boolean;
