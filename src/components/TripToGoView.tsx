@@ -144,35 +144,35 @@ export function TripToGoView({ data, onChange }: Props) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-3 sm:px-8 py-4 sm:py-8 flex flex-col gap-4 sm:gap-6 select-none">
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-8 py-3 sm:py-8 flex flex-col gap-3 sm:gap-6 select-none overflow-x-hidden">
       {/* Header Summary Banner */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border border-amber-200/80 rounded-2xl p-3.5 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm font-semibold text-base sm:text-lg shrink-0">
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border border-amber-200/80 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm font-semibold text-base sm:text-lg shrink-0">
             🗺️
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <h2 className="text-sm sm:text-lg font-heading font-bold text-stone-800 tracking-tight">TripToGo Flowchart</h2>
-              <span className="text-[10px] sm:text-[11px] font-semibold uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-300">
+              <h2 className="text-sm sm:text-lg font-heading font-bold text-stone-800 tracking-tight truncate">TripToGo Flowchart</h2>
+              <span className="text-[9px] sm:text-[11px] font-semibold uppercase px-1.5 sm:px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-300">
                 Itinerary Mode
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-stone-500 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-stone-500 mt-0.5 hidden xs:block">
               Plan and connect your travel route chronologically with interactive checkpoints.
             </p>
           </div>
         </div>
 
         {/* Progress Pill */}
-        <div className="flex items-center gap-3 bg-white/90 border border-amber-200/80 px-3.5 py-1.5 sm:py-2 rounded-xl shadow-2xs shrink-0 self-stretch sm:self-auto justify-between sm:justify-start">
+        <div className="flex items-center gap-2 sm:gap-3 bg-white/90 border border-amber-200/80 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl shadow-2xs shrink-0 w-full sm:w-auto justify-between sm:justify-start">
           <div className="flex flex-col">
             <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-stone-400">Visited Progress</span>
             <span className="text-xs font-semibold text-stone-800">
               {visitedSpots} of {totalSpots} checkpoints ({progressPercent}%)
             </span>
           </div>
-          <div className="w-12 h-2 bg-stone-100 rounded-full overflow-hidden border border-stone-200/60">
+          <div className="w-16 sm:w-20 h-2 bg-stone-100 rounded-full overflow-hidden border border-stone-200/60">
             <div 
               className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
               style={{ width: `${progressPercent}%` }}
@@ -199,7 +199,7 @@ export function TripToGoView({ data, onChange }: Props) {
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={() => setDragOverIndex(null)}
                 onDrop={(e) => handleDrop(e, index)}
-                className={`group relative w-full rounded-2xl border transition-all duration-200 p-3.5 sm:p-5 shadow-xs ${
+                className={`group relative w-full rounded-xl sm:rounded-2xl border transition-all duration-200 p-3 sm:p-5 shadow-xs ${
                   node.isVisited 
                     ? 'bg-emerald-50/40 border-emerald-300 ring-1 ring-emerald-400/30' 
                     : `${catStyle.bg} ${catStyle.border} hover:border-stone-300 hover:shadow-sm`
@@ -209,12 +209,12 @@ export function TripToGoView({ data, onChange }: Props) {
                   isDragOver ? 'border-amber-500 ring-2 ring-amber-300 ring-offset-2' : ''
                 }`}
               >
-                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                <div className="flex items-start justify-between gap-1.5 sm:gap-3">
                   {/* Left: Grip Handle + Visited Checkbox + Place Info */}
                   <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
                     <div 
                       title="Drag to reorder checkpoint"
-                      className="p-1 cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-700 transition-colors mt-0.5 shrink-0"
+                      className="p-0.5 cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-700 transition-colors mt-0.5 shrink-0"
                     >
                       <GripVertical size={15} />
                     </div>
@@ -234,24 +234,27 @@ export function TripToGoView({ data, onChange }: Props) {
                     </button>
 
                     {/* Place Name and Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1">
-                        <span className="text-sm font-semibold">{catStyle.icon}</span>
-                        <input
-                          type="text"
-                          value={node.name}
-                          onChange={(e) => handleUpdateNode(node.id, { name: e.target.value })}
-                          placeholder="Place or activity name..."
-                          className={`flex-1 min-w-[120px] text-sm sm:text-base font-semibold bg-transparent outline-none border-b border-transparent hover:border-stone-300 focus:border-amber-500 transition-colors ${
-                            node.isVisited ? 'text-emerald-950 line-through opacity-80' : 'text-stone-900'
-                          }`}
-                        />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {/* Top row: Name & Category */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <span className="text-sm font-semibold shrink-0">{catStyle.icon}</span>
+                          <input
+                            type="text"
+                            value={node.name}
+                            onChange={(e) => handleUpdateNode(node.id, { name: e.target.value })}
+                            placeholder="Place or activity name..."
+                            className={`w-full text-sm sm:text-base font-semibold bg-transparent outline-none border-b border-transparent hover:border-stone-300 focus:border-amber-500 transition-colors ${
+                              node.isVisited ? 'text-emerald-950 line-through opacity-80' : 'text-stone-900'
+                            }`}
+                          />
+                        </div>
                         
                         {/* Category Selector */}
                         <select
                           value={node.category || 'attraction'}
                           onChange={(e) => handleUpdateNode(node.id, { category: e.target.value as any })}
-                          className="text-[11px] font-medium text-stone-600 bg-white/90 border border-stone-200 rounded-md px-2 py-0.5 outline-none cursor-pointer hover:border-stone-400"
+                          className="self-start text-[11px] font-medium text-stone-600 bg-white/95 border border-stone-200 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-stone-400 shrink-0"
                         >
                           <option value="attraction">🏰 Attraction</option>
                           <option value="food">🍜 Food / Cafe</option>
@@ -287,42 +290,42 @@ export function TripToGoView({ data, onChange }: Props) {
                         };
 
                         return (
-                          <div className="flex flex-col gap-1.5 my-2">
+                          <div className="flex flex-col gap-1.5 w-full">
                             {items.map((item, cIndex) => (
                               <div 
                                 key={item.id || cIndex}
-                                className="group/checkin flex items-center gap-2 bg-white/70 border border-stone-200/70 hover:border-amber-300 rounded-lg px-2.5 py-1 transition-all"
+                                className="group/checkin flex items-center gap-1.5 sm:gap-2 bg-white/85 border border-stone-200/80 hover:border-amber-300 rounded-lg px-2 py-1 transition-all w-full"
                               >
-                                <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                                <label className="flex items-center gap-1 cursor-pointer shrink-0">
                                   <input
                                     type="checkbox"
                                     checked={!!item.isChecked}
                                     onChange={(e) => handleUpdateCheckIn(item.id, { isChecked: e.target.checked })}
                                     className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-stone-300 accent-amber-600 cursor-pointer"
                                   />
-                                  <span className={`text-[11px] font-medium transition-colors ${item.isChecked ? 'text-amber-700 font-semibold' : 'text-stone-500'}`}>
-                                    📍 Check-in {items.length > 1 ? `#${cIndex + 1}:` : ':'}
+                                  <span className={`text-[10px] sm:text-[11px] font-medium transition-colors ${item.isChecked ? 'text-amber-700 font-semibold' : 'text-stone-500'}`}>
+                                    📍 Check-in:
                                   </span>
                                 </label>
                                 <input
                                   type="text"
                                   value={item.label}
                                   onChange={(e) => handleUpdateCheckIn(item.id, { label: e.target.value })}
-                                  placeholder="Check-in point (e.g. Gate 4, Counter 2, Lobby, Spot #A)..."
-                                  className={`flex-1 text-xs bg-transparent outline-none placeholder:text-stone-400 font-medium ${
+                                  placeholder="Sub-heading e.g. Gate 4, Lobby, Spot #A..."
+                                  className={`flex-1 min-w-0 text-xs bg-transparent outline-none placeholder:text-stone-400 font-medium ${
                                     item.isChecked ? 'text-amber-900 line-through opacity-80' : 'text-stone-600'
                                   }`}
                                 />
                                 {item.isChecked && (
-                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-300 shrink-0">
-                                    Checked In
+                                  <span className="text-[9px] sm:text-[10px] uppercase font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-300 shrink-0">
+                                    Done
                                   </span>
                                 )}
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteCheckIn(item.id)}
                                   title="Delete this check-in point"
-                                  className="opacity-0 group-hover/checkin:opacity-100 p-0.5 text-stone-300 hover:text-red-500 transition-opacity"
+                                  className="opacity-60 sm:opacity-0 group-hover/checkin:opacity-100 p-0.5 text-stone-400 hover:text-red-500 transition-opacity shrink-0"
                                 >
                                   &times;
                                 </button>
@@ -330,11 +333,11 @@ export function TripToGoView({ data, onChange }: Props) {
                             ))}
 
                             {/* Button to add more sub-check-in points */}
-                            <div className="flex items-center">
+                            <div className="flex items-center pt-0.5">
                               <button
                                 type="button"
                                 onClick={handleAddCheckIn}
-                                className="text-[11px] font-medium text-amber-700 hover:text-amber-900 bg-amber-50/80 hover:bg-amber-100/80 border border-amber-200/80 rounded-md px-2 py-0.5 flex items-center gap-1 transition-colors cursor-pointer"
+                                className="text-[11px] font-medium text-amber-700 hover:text-amber-900 bg-amber-50/80 hover:bg-amber-100 border border-amber-200/80 rounded-md px-2 py-0.5 flex items-center gap-1 transition-colors cursor-pointer"
                               >
                                 <Plus size={12} />
                                 <span>{items.length === 0 ? 'Add Check-in Point' : '+ Add Another Check-in Point'}</span>
@@ -344,23 +347,25 @@ export function TripToGoView({ data, onChange }: Props) {
                         );
                       })()}
 
-                      {/* Time Range and Note Inputs */}
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mt-2">
+                      {/* Bottom Row: Time Range & Notes (Stacked on mobile, side-by-side on desktop) */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 w-full">
                         {/* Time Range */}
-                        <div className="flex items-center gap-1.5 bg-white/90 border border-stone-200/80 px-2.5 py-1 rounded-lg text-xs text-stone-700 shadow-2xs">
-                          <Clock size={13} className="text-amber-600 shrink-0" />
-                          <input
-                            type="time"
-                            value={node.timeStart || '09:00'}
-                            onChange={(e) => handleUpdateNode(node.id, { timeStart: e.target.value })}
-                            className="bg-transparent font-mono text-xs outline-none cursor-pointer"
-                          />
+                        <div className="flex items-center justify-between sm:justify-start gap-1.5 bg-white/95 border border-stone-200/80 px-2.5 py-1 rounded-lg text-xs text-stone-700 shadow-2xs shrink-0">
+                          <div className="flex items-center gap-1">
+                            <Clock size={13} className="text-amber-600 shrink-0" />
+                            <input
+                              type="time"
+                              value={node.timeStart || '09:00'}
+                              onChange={(e) => handleUpdateNode(node.id, { timeStart: e.target.value })}
+                              className="bg-transparent font-mono text-xs outline-none cursor-pointer w-16"
+                            />
+                          </div>
                           <span className="text-stone-400 text-[10px]">to</span>
                           <input
                             type="time"
                             value={node.timeEnd || '10:30'}
                             onChange={(e) => handleUpdateNode(node.id, { timeEnd: e.target.value })}
-                            className="bg-transparent font-mono text-xs outline-none cursor-pointer"
+                            className="bg-transparent font-mono text-xs outline-none cursor-pointer w-16"
                           />
                         </div>
 
@@ -369,26 +374,26 @@ export function TripToGoView({ data, onChange }: Props) {
                           type="text"
                           value={node.note || ''}
                           onChange={(e) => handleUpdateNode(node.id, { note: e.target.value })}
-                          placeholder="Add details, tickets, reservation note..."
-                          className="flex-1 w-full sm:w-auto text-xs bg-white/70 border border-stone-200/60 rounded-lg px-2.5 py-1 text-stone-600 placeholder:text-stone-400 outline-none focus:border-stone-400 focus:bg-white"
+                          placeholder="Add details, reservation note..."
+                          className="flex-1 w-full min-w-0 text-xs bg-white/90 border border-stone-200/70 rounded-lg px-2.5 py-1 text-stone-600 placeholder:text-stone-400 outline-none focus:border-amber-400 focus:bg-white transition-colors"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Right Actions */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1 shrink-0">
                     <button
                       onClick={() => handleAddNode(index)}
                       title="Insert checkpoint after this"
-                      className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-amber-600 hover:bg-amber-100/60 rounded transition-all"
+                      className="p-1 text-stone-400 hover:text-amber-600 hover:bg-amber-100/60 rounded transition-all"
                     >
                       <Plus size={15} />
                     </button>
                     <button
                       onClick={() => handleDeleteNode(node.id)}
                       title="Delete checkpoint"
-                      className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+                      className="p-1 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
                     >
                       <Trash2 size={15} />
                     </button>
