@@ -214,23 +214,41 @@ export function NoteEditor() {
     );
   }
 
-  const isTripMode = isTripToGoContent(localNote.content);
-  const noteContent = parseNoteContent(localNote.content);
+  // Check if current view mode is TripToGo
+  // We track user mode choice in state or derive from content
+  const [viewMode, setViewMode] = useState<'standard' | 'triptogo'>('standard');
+
+  useEffect(() => {
+    if (localNote && isTripToGoContent(localNote.content)) {
+      setViewMode('triptogo');
+    }
+  }, [localNote?.id]);
+
+  const isTripMode = viewMode === 'triptogo';
   const tripParsed = parseTripToGoContent(localNote.content);
+  const noteContent = parseNoteContent(tripParsed.text);
 
   const handleToggleMode = async (mode: 'standard' | 'triptogo') => {
+    setViewMode(mode);
     if (!localNote) return;
-    if (mode === 'triptogo' && !isTripMode) {
+    
+    // Ensure content always has serialized trip data preserved
+    if (mode === 'triptogo' && !isTripToGoContent(localNote.content)) {
       const serialized = serializeTripToGoContent(noteContent.text, tripParsed.data);
       const updated = { ...localNote, content: serialized };
       setLocalNote(updated);
       if (user) await updateNote(localNote.id, user.id, { content: serialized });
-    } else if (mode === 'standard' && isTripMode) {
-      const regularText = tripParsed.text;
-      const updated = { ...localNote, content: regularText };
-      setLocalNote(updated);
-      if (user) await updateNote(localNote.id, user.id, { content: regularText });
     }
+  };
+
+  const handleNoteTextChange = (newText: string) => {
+    if (!localNote) return;
+    // If note has TripToGo data, preserve it at the end of the text
+    const serialized = isTripToGoContent(localNote.content) || viewMode === 'triptogo'
+      ? serializeTripToGoContent(newText, tripParsed.data)
+      : serializeNoteContent(newText, noteContent.blocks);
+      
+    setLocalNote({ ...localNote, content: serialized });
   };
 
   const handleTripDataChange = (newData: TripToGoData) => {
@@ -376,9 +394,7 @@ export function NoteEditor() {
               <TextareaAutosize
                 ref={textareaRef}
                 value={noteContent.text}
-                onChange={(e) => {
-                  setLocalNote({ ...localNote!, content: serializeNoteContent(e.target.value, noteContent.blocks) });
-                }}
+                onChange={(e) => handleNoteTextChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePasteImage}
                 placeholder="Start writing..."
