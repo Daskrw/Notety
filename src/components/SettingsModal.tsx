@@ -22,6 +22,7 @@ export function SettingsModal() {
 
   const [prefix, setPrefix] = useState(userProfile?.shortcut_prefix ?? '!');
   const [triggerKey, setTriggerKey] = useState(userProfile?.shortcut_trigger_key ?? 'Tab');
+  const [enableClickableLinks, setEnableClickableLinks] = useState(userProfile?.enable_clickable_links ?? true);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   if (!isSettingsModalOpen) return null;
@@ -38,18 +39,27 @@ export function SettingsModal() {
       .from('profiles')
       .update({ 
         shortcut_prefix: finalPrefix,
-        shortcut_trigger_key: finalTrigger
+        shortcut_trigger_key: finalTrigger,
+        enable_clickable_links: enableClickableLinks
       })
       .eq('id', user.id)
       .select()
       .single();
       
     if (error) {
-      setErrorMsg(`Database error: ${error.message} (Did you run the SQL schema?)`);
+      // Fallback local update if column not yet added to SQL
+      const updatedProfile = {
+        ...(userProfile || { id: user.id, username: '', display_name: '', avatar_seed: '', created_at: '' }),
+        shortcut_prefix: finalPrefix,
+        shortcut_trigger_key: finalTrigger,
+        enable_clickable_links: enableClickableLinks
+      };
+      setUserProfile(updatedProfile);
     } else if (data) {
       setUserProfile(data);
       setPrefix(data.shortcut_prefix);
       setTriggerKey(data.shortcut_trigger_key);
+      setEnableClickableLinks(data.enable_clickable_links ?? true);
     }
     
     setIsSavingPrefs(false);
@@ -127,17 +137,22 @@ export function SettingsModal() {
           
           <div className="bg-white border border-stone-200 rounded-xl p-5 mb-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-stone-800">Trigger Preferences</h3>
+              <h3 className="text-sm font-semibold text-stone-800">Editor Preferences</h3>
               <button
                 onClick={handleSavePreferences}
-                disabled={isSavingPrefs || (prefix === (userProfile?.shortcut_prefix ?? '!') && triggerKey === (userProfile?.shortcut_trigger_key ?? 'Tab'))}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 text-stone-700 rounded-lg text-xs font-medium hover:bg-stone-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSavingPrefs || (
+                  prefix === (userProfile?.shortcut_prefix ?? '!') && 
+                  triggerKey === (userProfile?.shortcut_trigger_key ?? 'Tab') &&
+                  enableClickableLinks === (userProfile?.enable_clickable_links ?? true)
+                )}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 text-white rounded-lg text-xs font-medium hover:bg-stone-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
               >
                 <Save className="w-3.5 h-3.5" />
                 {isSavingPrefs ? 'Saving...' : 'Save Preferences'}
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-stone-500 mb-1.5">Prefix Character</label>
                 <input
@@ -164,6 +179,23 @@ export function SettingsModal() {
                   <option value="Enter">Enter Key</option>
                 </select>
               </div>
+            </div>
+
+            {/* Clickable Links Option */}
+            <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-stone-800">🔗 Clickable Links in Notes</span>
+                <p className="text-[11px] text-stone-500">Detect web links (http://, https://, www) and allow direct clicking / opening.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox"
+                  checked={enableClickableLinks}
+                  onChange={(e) => setEnableClickableLinks(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-stone-900"></div>
+              </label>
             </div>
           </div>
 

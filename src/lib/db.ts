@@ -42,6 +42,7 @@ export interface UserProfile {
   created_at: string;
   shortcut_prefix?: string;
   shortcut_trigger_key?: string;
+  enable_clickable_links?: boolean;
 }
 
 export interface UserActivity {

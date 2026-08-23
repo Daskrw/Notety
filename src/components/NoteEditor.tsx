@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu, FileText, Map } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu, FileText, Map, ExternalLink, Globe } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
@@ -13,6 +13,14 @@ import { ImageBlockView } from './ImageBlockView';
 import { TripToGoView } from './TripToGoView';
 import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent, TripToGoData } from '@/lib/triptogo';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
+
+// Helper to extract URLs from text
+function extractUrls(text: string): string[] {
+  if (!text) return [];
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const matches = text.match(urlRegex) || [];
+  return Array.from(new Set(matches.map(u => u.startsWith('http') ? u : `https://${u}`)));
+}
 
 export function NoteEditor() {
   const { 
@@ -227,6 +235,7 @@ export function NoteEditor() {
   const isTripMode = viewMode === 'triptogo';
   const tripParsed = parseTripToGoContent(localNote.content);
   const noteContent = parseNoteContent(tripParsed.text);
+  const detectedLinks = useMemo(() => extractUrls(noteContent.text), [noteContent.text]);
 
   const handleToggleMode = async (mode: 'standard' | 'triptogo') => {
     setViewMode(mode);
@@ -396,6 +405,32 @@ export function NoteEditor() {
               placeholder="Note Title"
               className="w-full text-2xl sm:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-4 sm:mb-8 cursor-text"
             />
+
+            {/* Clickable Links Bar (If enabled in settings) */}
+            {(userProfile?.enable_clickable_links ?? true) && detectedLinks.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap p-2.5 bg-stone-50 border border-stone-200/80 rounded-xl mb-2">
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-stone-500 uppercase tracking-wider shrink-0 mr-1">
+                  <Globe size={13} className="text-stone-400" />
+                  <span>Links:</span>
+                </div>
+                {detectedLinks.map((url, idx) => {
+                  let display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                  if (display.length > 35) display = display.substring(0, 32) + '...';
+                  return (
+                    <a
+                      key={idx}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 border border-stone-200 hover:border-stone-400 text-stone-800 text-xs font-medium rounded-lg transition-all shadow-2xs hover:shadow-xs group/link"
+                    >
+                      <span className="truncate">{display}</span>
+                      <ExternalLink size={11} className="text-stone-400 group-hover/link:text-stone-700 shrink-0" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="flex-1 min-h-[500px] flex flex-col pb-32">
               <TextareaAutosize
