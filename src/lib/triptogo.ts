@@ -114,3 +114,4 @@ export function serializeTripToGoContent(text: string, data: TripToGoData): stri
   const jsonStr = JSON.stringify(data);
   return `${text.trim()}\n\n${TRIP_PREFIX}${jsonStr}${TRIP_SUFFIX}`;
 }
+

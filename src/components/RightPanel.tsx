@@ -8,6 +8,7 @@ import { PanelRightClose, Plus, FileText, Trash2, Layers, Sparkles, Pin, PinOff 
 import { format } from 'date-fns';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 import { parseNoteContent, serializeNoteContent } from '@/lib/blocks';
+import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent } from '@/lib/triptogo';
 import { PasswordBlockView } from './PasswordBlockView';
 import { PingBlockView } from './PingBlockView';
 import { JobBlockView } from './JobBlockView';
@@ -176,13 +177,19 @@ export function RightPanel() {
 
     setDraggedBlockIndex(null);
 
+    const baseContent = serializeNoteContent(noteContent.text, currentBlocks);
+    const serialized = isTripToGoContent(localNote.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(localNote.id, {
-      content: serializeNoteContent(noteContent.text, currentBlocks),
+      content: serialized,
       updated_at: Date.now()
     });
   };
 
-  const noteContent = parseNoteContent(localNote?.content || '');
+  const tripParsed = parseTripToGoContent(localNote?.content || '');
+  const noteContent = parseNoteContent(tripParsed.text);
 
   return (
     <>
