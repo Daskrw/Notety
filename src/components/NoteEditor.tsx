@@ -39,20 +39,11 @@ export function NoteEditor() {
     } else if (dbNote) {
       if (dbNote.id !== localNote?.id) {
         setLocalNote(dbNote);
-      } else if (!isTripToGoContent(dbNote.content)) {
-        const localParsed = parseNoteContent(localNote.content);
-        const dbParsed = parseNoteContent(dbNote.content);
-        if (JSON.stringify(localParsed.blocks) !== JSON.stringify(dbParsed.blocks)) {
-          setLocalNote(prev => prev ? {
-            ...prev,
-            content: serializeNoteContent(localParsed.text, dbParsed.blocks)
-          } : null);
-        }
       }
     }
-  }, [selectedNoteId, dbNote, localNote]);
+  }, [selectedNoteId, dbNote?.id]); // Only switch when note ID changes, avoiding clobbering active edits
 
-  useAutoSave(localNote, 1500);
+  useAutoSave(localNote, 400); // Responsive debounce save (400ms)
 
   const localNoteRef = useRef(localNote);
   localNoteRef.current = localNote;
@@ -227,19 +218,29 @@ export function NoteEditor() {
   const noteContent = parseNoteContent(localNote.content);
   const tripParsed = parseTripToGoContent(localNote.content);
 
-  const handleToggleMode = (mode: 'standard' | 'triptogo') => {
+  const handleToggleMode = async (mode: 'standard' | 'triptogo') => {
+    if (!localNote) return;
     if (mode === 'triptogo' && !isTripMode) {
       const serialized = serializeTripToGoContent(noteContent.text, tripParsed.data);
-      setLocalNote({ ...localNote, content: serialized });
+      const updated = { ...localNote, content: serialized };
+      setLocalNote(updated);
+      if (user) await updateNote(localNote.id, user.id, { content: serialized });
     } else if (mode === 'standard' && isTripMode) {
       const regularText = tripParsed.text;
-      setLocalNote({ ...localNote, content: regularText });
+      const updated = { ...localNote, content: regularText };
+      setLocalNote(updated);
+      if (user) await updateNote(localNote.id, user.id, { content: regularText });
     }
   };
 
   const handleTripDataChange = (newData: TripToGoData) => {
+    if (!localNote) return;
     const serialized = serializeTripToGoContent(tripParsed.text, newData);
-    setLocalNote({ ...localNote, content: serialized });
+    const updated = { ...localNote, content: serialized };
+    setLocalNote(updated);
+    if (user) {
+      updateNote(localNote.id, user.id, { content: serialized }).catch(console.error);
+    }
   };
 
   const handleSidebarMouseDown = (e: React.MouseEvent) => {
