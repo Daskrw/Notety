@@ -166,7 +166,7 @@ export function Sidebar() {
 
       <aside 
         onMouseLeave={() => { if (!isSidebarPinned) setSidebarHovered(false); }}
-        className={`w-64 sm:w-72 max-w-[55vw] sm:max-w-none fixed md:static top-0 left-0 bottom-0 bg-stone-50 border-r border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shrink-0 shadow-lg z-40 ${
+        className={`w-64 sm:w-72 max-w-[85vw] sm:max-w-none fixed md:static top-0 left-0 bottom-0 bg-stone-50 border-r border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shrink-0 shadow-lg z-40 ${
           isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 md:-mr-64 lg:-mr-72 pointer-events-none'
         }`}
       >

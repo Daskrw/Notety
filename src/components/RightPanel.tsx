@@ -245,7 +245,7 @@ export function RightPanel() {
       <aside 
         ref={panelRef}
         onMouseLeave={() => { if (!isRightPanelPinned) setRightPanelHovered(false); }}
-        className={`w-72 sm:w-80 md:w-96 max-w-[55vw] sm:max-w-none fixed md:static top-0 right-0 bottom-0 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shadow-xl z-40 shrink-0 ${
+        className={`w-72 sm:w-80 md:w-88 lg:w-96 max-w-[85vw] sm:max-w-none fixed md:static top-0 right-0 bottom-0 bg-white border-l border-stone-200 h-screen flex flex-col transition-all duration-300 ease-in-out shadow-xl z-40 shrink-0 ${
           isRightPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 md:-ml-80 lg:-ml-96 pointer-events-none'
         }`}
       >

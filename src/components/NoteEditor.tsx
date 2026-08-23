@@ -407,9 +407,9 @@ export function NoteEditor() {
 
   return (
     <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
-      {/* Top Toolbar */}
-      <div className="min-h-14 sm:h-16 py-2 px-3 sm:px-8 flex items-center justify-between border-b border-stone-100 flex-shrink-0 bg-white/95 backdrop-blur-xs z-10 gap-2">
-        <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0 flex-1">
+      {/* Top Toolbar - Fully Responsive */}
+      <div className="min-h-14 sm:h-16 py-2 px-3 sm:px-6 lg:px-8 flex items-center justify-between border-b border-stone-100 flex-shrink-0 bg-white/95 backdrop-blur-xs z-10 gap-1.5 sm:gap-3 flex-wrap">
+        <div className="flex items-center space-x-1.5 sm:space-x-2.5 min-w-0 flex-1 flex-wrap py-0.5">
           {!isSidebarPinned && (
             <button
               onMouseEnter={() => setSidebarHovered(true)}
@@ -417,7 +417,7 @@ export function NoteEditor() {
               onMouseUp={handleSidebarMouseUp}
               onClick={toggleSidebarPin}
               title="Toggle notes sidebar"
-              className="p-2 sm:p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg sm:rounded-md transition-all shrink-0 shadow-2xs active:scale-95 cursor-pointer"
+              className="p-1.5 sm:p-2 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg transition-all shrink-0 shadow-2xs active:scale-95 cursor-pointer"
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -426,7 +426,7 @@ export function NoteEditor() {
           <select
             value={localNote.category_id || 'uncategorized'}
             onChange={(e) => updateCategory(e.target.value)}
-            className="text-xs font-medium text-stone-600 bg-stone-50 sm:bg-transparent border sm:border-transparent border-stone-200/70 rounded-md px-1.5 py-1 sm:p-0 outline-none cursor-pointer hover:text-stone-900 transition-colors max-w-[100px] xs:max-w-[130px] sm:max-w-none truncate shrink-0"
+            className="text-xs font-medium text-stone-600 bg-stone-50 sm:bg-transparent border sm:border-transparent border-stone-200/70 rounded-lg px-2 py-1 sm:p-0 outline-none cursor-pointer hover:text-stone-900 transition-colors max-w-[110px] sm:max-w-[150px] md:max-w-none truncate shrink-0"
           >
             <option value="uncategorized">Uncategorized</option>
             {categories?.map(c => (
@@ -439,54 +439,54 @@ export function NoteEditor() {
             <button
               onClick={() => handleToggleMode('standard')}
               title="Standard Note Mode"
-              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
+              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
                 viewMode === 'standard'
                   ? 'bg-white text-stone-900 shadow-2xs font-semibold' 
                   : 'text-stone-500 hover:text-stone-800'
               }`}
             >
               <FileText size={12} />
-              <span className="hidden xs:inline">Note</span>
+              <span className="inline">Note</span>
             </button>
             <button
               onClick={() => handleToggleMode('triptogo')}
               title="TripToGo Flowchart Mode"
-              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
+              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
                 viewMode === 'triptogo' 
                   ? 'bg-amber-500 text-white shadow-2xs font-semibold' 
                   : 'text-stone-500 hover:text-stone-800'
               }`}
             >
               <Map size={12} />
-              <span>TripToGo</span>
+              <span className="inline">TripToGo</span>
             </button>
             <button
               onClick={() => handleToggleMode('oiltravel')}
               title="Oil Travel Mode"
-              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
+              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
                 viewMode === 'oiltravel'
                   ? 'bg-orange-500 text-white shadow-2xs font-semibold' 
                   : 'text-stone-500 hover:text-stone-800'
               }`}
             >
               <Fuel size={12} />
-              <span>Oil Travel</span>
+              <span className="inline">Oil Travel</span>
             </button>
           </div>
         </div>
 
-        <div className="flex items-center space-x-1 sm:space-x-3 text-stone-400 shrink-0">
+        <div className="flex items-center space-x-1 sm:space-x-2 text-stone-400 shrink-0">
           <button
             onClick={toggleFeatured}
             title="Feature this note"
-            className={`p-2 rounded-full transition-colors ${localNote.is_featured ? 'text-amber-500 bg-amber-50' : 'hover:bg-stone-100'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition-colors ${localNote.is_featured ? 'text-amber-500 bg-amber-50' : 'hover:bg-stone-100'}`}
           >
             <Star className={`w-4 h-4 ${localNote.is_featured ? 'fill-amber-500' : ''}`} />
           </button>
           <button
             onClick={handleDeleteNote}
             title="Delete note"
-            className="p-2 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -497,7 +497,7 @@ export function NoteEditor() {
               onMouseUp={handleRightPanelMouseUp}
               onClick={toggleRightPanelPin}
               title="Toggle panel"
-              className="p-2 sm:p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg sm:rounded-md transition-all shadow-2xs active:scale-95 cursor-pointer"
+              className="p-1.5 sm:p-2 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg transition-all shadow-2xs active:scale-95 cursor-pointer"
             >
               <PanelRightOpen className="w-4 h-4" />
             </button>
@@ -507,13 +507,13 @@ export function NoteEditor() {
 
       {isOilMode ? (
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-stone-50/40">
-          <div className="max-w-5xl mx-auto px-4 sm:px-8 pt-6">
+          <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
             <input
               type="text"
               value={localNote.title}
               onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
               placeholder="Fuel Log Title (e.g. 2026 Vehicle Refill Log)"
-              className="w-full text-2xl sm:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
+              className="w-full text-xl sm:text-2xl md:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
             />
           </div>
           <OilTravelView
@@ -523,13 +523,13 @@ export function NoteEditor() {
         </div>
       ) : isTripMode ? (
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-stone-50/40">
-          <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-6">
+          <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
             <input
               type="text"
               value={localNote.title}
               onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
               placeholder="Trip Title (e.g. Tokyo 5 Days Itinerary)"
-              className="w-full text-2xl sm:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
+              className="w-full text-xl sm:text-2xl md:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
             />
           </div>
           <TripToGoView
@@ -544,13 +544,13 @@ export function NoteEditor() {
           className="flex-1 overflow-y-auto w-full custom-scrollbar cursor-text"
           onClick={handleContainerClick}
         >
-          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-12 flex flex-col gap-4">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 py-6 sm:py-10 flex flex-col gap-4">
             <input
               type="text"
               value={localNote.title}
               onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
               placeholder="Note Title"
-              className="w-full text-2xl sm:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-4 sm:mb-8 cursor-text"
+              className="w-full text-2xl sm:text-3xl md:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 sm:mb-6 cursor-text"
             />
 
             {/* Clickable Links Bar (If enabled in settings) */}

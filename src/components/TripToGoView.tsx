@@ -144,14 +144,14 @@ export function TripToGoView({ data, onChange }: Props) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-2 sm:px-8 py-3 sm:py-8 flex flex-col gap-3 sm:gap-6 select-none overflow-x-hidden">
+    <div className="w-full max-w-4xl mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6 flex flex-col gap-3 sm:gap-6 select-none overflow-x-hidden">
       {/* Header Summary Banner */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border border-amber-200/80 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4">
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border border-amber-200/80 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 w-full sm:w-auto">
           <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm font-semibold text-base sm:text-lg shrink-0">
             🗺️
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <h2 className="text-sm sm:text-lg font-heading font-bold text-stone-800 tracking-tight truncate">TripToGo Flowchart</h2>
               <span className="text-[9px] sm:text-[11px] font-semibold uppercase px-1.5 sm:px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-300">
@@ -267,7 +267,6 @@ export function TripToGoView({ data, onChange }: Props) {
 
                       {/* Multiple Check-In Sub-Heading & Checkbox List */}
                       {(() => {
-                        // Normalize checkIns (support backwards compatibility with legacy single field)
                         const items: CheckInItem[] = node.checkIns && node.checkIns.length > 0
                           ? node.checkIns
                           : node.checkInSubHeading || node.isCheckedIn
@@ -325,7 +324,7 @@ export function TripToGoView({ data, onChange }: Props) {
                                   type="button"
                                   onClick={() => handleDeleteCheckIn(item.id)}
                                   title="Delete this check-in point"
-                                  className="opacity-60 sm:opacity-0 group-hover/checkin:opacity-100 p-0.5 text-stone-400 hover:text-red-500 transition-opacity shrink-0"
+                                  className="opacity-70 sm:opacity-0 group-hover/checkin:opacity-100 p-0.5 text-stone-400 hover:text-red-500 transition-opacity shrink-0"
                                 >
                                   &times;
                                 </button>
@@ -386,14 +385,14 @@ export function TripToGoView({ data, onChange }: Props) {
                     <button
                       onClick={() => handleAddNode(index)}
                       title="Insert checkpoint after this"
-                      className="p-1 text-stone-400 hover:text-amber-600 hover:bg-amber-100/60 rounded transition-all"
+                      className="p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-100/60 rounded transition-all"
                     >
                       <Plus size={15} />
                     </button>
                     <button
                       onClick={() => handleDeleteNode(node.id)}
                       title="Delete checkpoint"
-                      className="p-1 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+                      className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
                     >
                       <Trash2 size={15} />
                     </button>
@@ -408,8 +407,8 @@ export function TripToGoView({ data, onChange }: Props) {
                   <div className="w-0.5 h-3 bg-stone-300"></div>
 
                   {/* Transit Badge / Pill */}
-                  <div className="flex items-center gap-2 bg-white border border-stone-200/80 hover:border-amber-400 px-3 py-1 rounded-full shadow-2xs transition-all text-xs text-stone-600">
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 bg-white border border-stone-200/80 hover:border-amber-400 px-2.5 sm:px-3 py-1 rounded-full shadow-2xs transition-all text-xs text-stone-600 max-w-full overflow-hidden">
+                    <div className="flex items-center gap-1 shrink-0">
                       {TRANSPORT_ICONS[transit.transportType]?.icon || TRANSPORT_ICONS.walk.icon}
                       <select
                         value={transit.transportType}
@@ -417,7 +416,7 @@ export function TripToGoView({ data, onChange }: Props) {
                         className="text-[11px] font-medium bg-transparent outline-none cursor-pointer pr-1"
                       >
                         <option value="walk">🚶 Walk</option>
-                        <option value="train">🚇 Train / Metro</option>
+                        <option value="train">🚇 Train</option>
                         <option value="car">🚗 Taxi / Car</option>
                         <option value="bus">🚌 Bus</option>
                         <option value="flight">✈️ Flight</option>
@@ -432,12 +431,12 @@ export function TripToGoView({ data, onChange }: Props) {
                       type="text"
                       value={transit.duration || '15m'}
                       onChange={(e) => handleUpdateTransit(node.id, nextNode.id, { duration: e.target.value })}
-                      placeholder="Duration (e.g. 20m)"
-                      className="w-12 text-[11px] font-mono text-stone-700 bg-transparent outline-none text-center hover:bg-stone-50 rounded"
+                      placeholder="15m"
+                      className="w-12 text-[11px] font-mono text-stone-700 bg-transparent outline-none text-center hover:bg-stone-50 rounded shrink-0"
                     />
 
                     {/* In Transit Arrow */}
-                    <ArrowDown size={13} className="text-amber-500 group-hover/transit:translate-y-0.5 transition-transform" />
+                    <ArrowDown size={13} className="text-amber-500 group-hover/transit:translate-y-0.5 transition-transform shrink-0" />
                   </div>
 
                   {/* Vertical dotted line bottom */}
@@ -454,7 +453,7 @@ export function TripToGoView({ data, onChange }: Props) {
             <p className="text-sm text-stone-500 mb-3">No trip stops added yet.</p>
             <button
               onClick={() => handleAddNode()}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5"
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus size={14} />
               <span>Add First Checkpoint</span>
@@ -465,10 +464,10 @@ export function TripToGoView({ data, onChange }: Props) {
 
       {/* Bottom Add Next Destination Button */}
       {nodes.length > 0 && (
-        <div className="flex justify-center pt-2 pb-12">
+        <div className="flex justify-center pt-2 pb-8">
           <button
             onClick={() => handleAddNode()}
-            className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center gap-2 hover:scale-[1.02] active:scale-95"
+            className="w-full sm:w-auto px-6 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
             <Plus size={15} />
             <span>Add Next Destination</span>
