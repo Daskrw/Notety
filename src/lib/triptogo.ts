@@ -1,10 +1,17 @@
 export type TransportType = 'walk' | 'train' | 'car' | 'bus' | 'flight' | 'ferry' | 'custom';
 
+export interface CheckInItem {
+  id: string;
+  label: string;
+  isChecked: boolean;
+}
+
 export interface TripLocationNode {
   id: string;
   name: string;
-  checkInSubHeading?: string; // e.g. "Check-in: Counter 4 / Terminal 2" or hotel room
-  isCheckedIn?: boolean;
+  checkInSubHeading?: string; // legacy fallback
+  isCheckedIn?: boolean;      // legacy fallback
+  checkIns?: CheckInItem[];   // list of multiple sub-checkin points
   timeStart: string; // e.g. '09:00'
   timeEnd: string;   // e.g. '11:30'
   isVisited: boolean;

@@ -6,7 +6,7 @@ import {
   Sparkles, Calendar, DollarSign, GripVertical, ChevronRight, Check
 } from 'lucide-react';
 import { 
-  TripToGoData, TripLocationNode, TripTransit, TransportType 
+  TripToGoData, TripLocationNode, TripTransit, TransportType, CheckInItem 
 } from '@/lib/triptogo';
 
 interface Props {
@@ -262,34 +262,87 @@ export function TripToGoView({ data, onChange }: Props) {
                         </select>
                       </div>
 
-                      {/* Check-In Sub-Heading & Checkbox Row */}
-                      <div className="flex items-center gap-2 my-1.5 bg-white/60 border border-stone-200/60 hover:border-amber-300/80 rounded-lg px-2.5 py-1 transition-all">
-                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={!!node.isCheckedIn}
-                            onChange={(e) => handleUpdateNode(node.id, { isCheckedIn: e.target.checked })}
-                            className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-stone-300 accent-amber-600 cursor-pointer"
-                          />
-                          <span className={`text-[11px] font-medium transition-colors ${node.isCheckedIn ? 'text-amber-700 font-semibold' : 'text-stone-500'}`}>
-                            📍 Check-in:
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={node.checkInSubHeading || ''}
-                          onChange={(e) => handleUpdateNode(node.id, { checkInSubHeading: e.target.value })}
-                          placeholder="Sub-heading e.g. Gate 4, Lobby desk, Spot #A..."
-                          className={`flex-1 text-xs bg-transparent outline-none placeholder:text-stone-400 font-medium ${
-                            node.isCheckedIn ? 'text-amber-900' : 'text-stone-600'
-                          }`}
-                        />
-                        {node.isCheckedIn && (
-                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-300 shrink-0">
-                            Checked In
-                          </span>
-                        )}
-                      </div>
+                      {/* Multiple Check-In Sub-Heading & Checkbox List */}
+                      {(() => {
+                        // Normalize checkIns (support backwards compatibility with legacy single field)
+                        const items: CheckInItem[] = node.checkIns && node.checkIns.length > 0
+                          ? node.checkIns
+                          : node.checkInSubHeading || node.isCheckedIn
+                          ? [{ id: 'legacy-1', label: node.checkInSubHeading || '', isChecked: !!node.isCheckedIn }]
+                          : [];
+
+                        const handleAddCheckIn = () => {
+                          const updated = [...items, { id: crypto.randomUUID(), label: '', isChecked: false }];
+                          handleUpdateNode(node.id, { checkIns: updated });
+                        };
+
+                        const handleUpdateCheckIn = (itemId: string, updates: Partial<CheckInItem>) => {
+                          const updated = items.map(it => it.id === itemId ? { ...it, ...updates } : it);
+                          handleUpdateNode(node.id, { checkIns: updated });
+                        };
+
+                        const handleDeleteCheckIn = (itemId: string) => {
+                          const updated = items.filter(it => it.id !== itemId);
+                          handleUpdateNode(node.id, { checkIns: updated });
+                        };
+
+                        return (
+                          <div className="flex flex-col gap-1.5 my-2">
+                            {items.map((item, cIndex) => (
+                              <div 
+                                key={item.id || cIndex}
+                                className="group/checkin flex items-center gap-2 bg-white/70 border border-stone-200/70 hover:border-amber-300 rounded-lg px-2.5 py-1 transition-all"
+                              >
+                                <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!item.isChecked}
+                                    onChange={(e) => handleUpdateCheckIn(item.id, { isChecked: e.target.checked })}
+                                    className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-stone-300 accent-amber-600 cursor-pointer"
+                                  />
+                                  <span className={`text-[11px] font-medium transition-colors ${item.isChecked ? 'text-amber-700 font-semibold' : 'text-stone-500'}`}>
+                                    📍 Check-in {items.length > 1 ? `#${cIndex + 1}:` : ':'}
+                                  </span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.label}
+                                  onChange={(e) => handleUpdateCheckIn(item.id, { label: e.target.value })}
+                                  placeholder="Check-in point (e.g. Gate 4, Counter 2, Lobby, Spot #A)..."
+                                  className={`flex-1 text-xs bg-transparent outline-none placeholder:text-stone-400 font-medium ${
+                                    item.isChecked ? 'text-amber-900 line-through opacity-80' : 'text-stone-600'
+                                  }`}
+                                />
+                                {item.isChecked && (
+                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-300 shrink-0">
+                                    Checked In
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCheckIn(item.id)}
+                                  title="Delete this check-in point"
+                                  className="opacity-0 group-hover/checkin:opacity-100 p-0.5 text-stone-300 hover:text-red-500 transition-opacity"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+
+                            {/* Button to add more sub-check-in points */}
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={handleAddCheckIn}
+                                className="text-[11px] font-medium text-amber-700 hover:text-amber-900 bg-amber-50/80 hover:bg-amber-100/80 border border-amber-200/80 rounded-md px-2 py-0.5 flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <Plus size={12} />
+                                <span>{items.length === 0 ? 'Add Check-in Point' : '+ Add Another Check-in Point'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Time Range and Note Inputs */}
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mt-2">
