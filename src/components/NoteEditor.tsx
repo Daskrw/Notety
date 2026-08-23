@@ -236,13 +236,11 @@ export function NoteEditor() {
 
   const [viewMode, setViewMode] = useState<'standard' | 'triptogo'>('standard');
 
+  // When switching notes, always open in standard Notes mode by default
   useEffect(() => {
-    if (localNote && isTripToGoContent(localNote.content)) {
-      setViewMode('triptogo');
-    } else {
-      setViewMode('standard');
-    }
+    setViewMode('standard');
   }, [localNote?.id]);
+
 
   const tripParsed = parseTripToGoContent(localNote?.content || '');
   const noteContent = parseNoteContent(tripParsed.text);
