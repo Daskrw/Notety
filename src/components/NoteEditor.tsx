@@ -198,6 +198,16 @@ export function NoteEditor() {
     }
   }, [selectedNoteId, allNotes, setSelectedNoteId]);
 
+  const [viewMode, setViewMode] = useState<'standard' | 'triptogo'>('standard');
+
+  useEffect(() => {
+    if (localNote && isTripToGoContent(localNote.content)) {
+      setViewMode('triptogo');
+    } else {
+      setViewMode('standard');
+    }
+  }, [localNote?.id]);
+
   if (!selectedNoteId || !localNote) {
     return (
       <div className="flex-1 flex flex-col h-screen bg-white">
@@ -213,16 +223,6 @@ export function NoteEditor() {
       </div>
     );
   }
-
-  // Check if current view mode is TripToGo
-  // We track user mode choice in state or derive from content
-  const [viewMode, setViewMode] = useState<'standard' | 'triptogo'>('standard');
-
-  useEffect(() => {
-    if (localNote && isTripToGoContent(localNote.content)) {
-      setViewMode('triptogo');
-    }
-  }, [localNote?.id]);
 
   const isTripMode = viewMode === 'triptogo';
   const tripParsed = parseTripToGoContent(localNote.content);
