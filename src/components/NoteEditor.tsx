@@ -216,6 +216,10 @@ export function NoteEditor() {
     }
   }, [localNote?.id]);
 
+  const tripParsed = parseTripToGoContent(localNote?.content || '');
+  const noteContent = parseNoteContent(tripParsed.text);
+  const detectedLinks = useMemo(() => extractUrls(noteContent.text), [noteContent.text]);
+
   if (!selectedNoteId || !localNote) {
     return (
       <div className="flex-1 flex flex-col h-screen bg-white">
@@ -233,9 +237,6 @@ export function NoteEditor() {
   }
 
   const isTripMode = viewMode === 'triptogo';
-  const tripParsed = parseTripToGoContent(localNote.content);
-  const noteContent = parseNoteContent(tripParsed.text);
-  const detectedLinks = useMemo(() => extractUrls(noteContent.text), [noteContent.text]);
 
   const handleToggleMode = async (mode: 'standard' | 'triptogo') => {
     setViewMode(mode);
