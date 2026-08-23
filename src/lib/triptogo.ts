@@ -45,7 +45,7 @@ export function isTripToGoContent(content: string): boolean {
   return typeof content === 'string' && content.includes(TRIP_PREFIX) && content.includes(TRIP_SUFFIX);
 }
 
-export function parseTripToGoContent(content: string): { data: TripToGoData; text: string } {
+export function parseTripToGoContent(content: string): { data: TripToGoData; text: string; blocks?: any[] } {
   if (!isTripToGoContent(content)) {
     return {
       data: {
@@ -112,6 +112,8 @@ export function parseTripToGoContent(content: string): { data: TripToGoData; tex
 
 export function serializeTripToGoContent(text: string, data: TripToGoData): string {
   const jsonStr = JSON.stringify(data);
-  return `${text.trim()}\n\n${TRIP_PREFIX}${jsonStr}${TRIP_SUFFIX}`;
+  const cleanText = text ? text.replace(new RegExp(`${TRIP_PREFIX}[\\s\\S]*?${TRIP_SUFFIX}`, 'g'), '').trim() : '';
+  return cleanText ? `${cleanText}\n\n${TRIP_PREFIX}${jsonStr}${TRIP_SUFFIX}` : `${TRIP_PREFIX}${jsonStr}${TRIP_SUFFIX}`;
 }
+
 

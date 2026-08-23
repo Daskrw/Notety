@@ -4,6 +4,8 @@ import { useDraggableBlock } from '@/hooks/useDragBlock';
 import { useAppStore } from '@/store/useStore';
 import { db } from '@/lib/db';
 import { parseNoteContent, serializeNoteContent, ImageBlock } from '@/lib/blocks';
+import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent } from '@/lib/triptogo';
+
 
 function PasswordBlockDraggable() {
   const { selectedNoteId } = useAppStore();
@@ -14,10 +16,16 @@ function PasswordBlockDraggable() {
     if (!selectedNoteId) return;
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
-    const content = parseNoteContent(note.content);
+    const tripParsed = parseTripToGoContent(note.content);
+    const content = parseNoteContent(tripParsed.text);
     const newBlock = { id: crypto.randomUUID(), type: 'password' as const, value: '' };
+    const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
+    const finalContent = isTripToGoContent(note.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(selectedNoteId, {
-      content: serializeNoteContent(content.text, [...content.blocks, newBlock]),
+      content: finalContent,
       updated_at: Date.now()
     });
   };
@@ -44,10 +52,16 @@ function PingBlockDraggable() {
     if (!selectedNoteId) return;
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
-    const content = parseNoteContent(note.content);
+    const tripParsed = parseTripToGoContent(note.content);
+    const content = parseNoteContent(tripParsed.text);
     const newBlock = { id: crypto.randomUUID(), type: 'ping' as const, value: '' };
+    const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
+    const finalContent = isTripToGoContent(note.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(selectedNoteId, {
-      content: serializeNoteContent(content.text, [...content.blocks, newBlock]),
+      content: finalContent,
       updated_at: Date.now()
     });
   };
@@ -78,10 +92,16 @@ function JobBlockDraggable() {
     if (!selectedNoteId) return;
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
-    const content = parseNoteContent(note.content);
+    const tripParsed = parseTripToGoContent(note.content);
+    const content = parseNoteContent(tripParsed.text);
     const newBlock = { id: crypto.randomUUID(), type: 'job' as const, value: { totalTasks: 0, tasks: [] } };
+    const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
+    const finalContent = isTripToGoContent(note.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(selectedNoteId, {
-      content: serializeNoteContent(content.text, [...content.blocks, newBlock]),
+      content: finalContent,
       updated_at: Date.now()
     });
   };
@@ -113,14 +133,20 @@ function ScheduleBlockDraggable() {
     if (!selectedNoteId) return;
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
-    const content = parseNoteContent(note.content);
+    const tripParsed = parseTripToGoContent(note.content);
+    const content = parseNoteContent(tripParsed.text);
     const newBlock = { 
       id: crypto.randomUUID(), 
       type: 'schedule' as const, 
       value: { year: now.getFullYear(), month: now.getMonth(), dayDetails: {} } 
     };
+    const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
+    const finalContent = isTripToGoContent(note.content)
+      ? serializeTripToGoContent(baseContent, tripParsed.data)
+      : baseContent;
+
     await db.notes.update(selectedNoteId, {
-      content: serializeNoteContent(content.text, [...content.blocks, newBlock]),
+      content: finalContent,
       updated_at: Date.now()
     });
   };
@@ -153,7 +179,8 @@ function PhotoUploadButton() {
       const note = await db.notes.get(selectedNoteId);
       if (!note) return;
 
-      const noteContent = parseNoteContent(note.content);
+      const tripParsed = parseTripToGoContent(note.content);
+      const noteContent = parseNoteContent(tripParsed.text);
       const newImageBlock: ImageBlock = {
         id: crypto.randomUUID(),
         type: 'image',
@@ -162,8 +189,13 @@ function PhotoUploadButton() {
       };
 
       const newBlocks = [...noteContent.blocks, newImageBlock];
+      const baseContent = serializeNoteContent(noteContent.text, newBlocks);
+      const finalContent = isTripToGoContent(note.content)
+        ? serializeTripToGoContent(baseContent, tripParsed.data)
+        : baseContent;
+
       await db.notes.update(selectedNoteId, {
-        content: serializeNoteContent(noteContent.text, newBlocks),
+        content: finalContent,
         updated_at: Date.now()
       });
 

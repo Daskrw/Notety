@@ -242,9 +242,9 @@ export function NoteEditor() {
     setViewMode(mode);
     if (!localNote) return;
     
-    // Ensure content always has serialized trip data preserved
     if (mode === 'triptogo' && !isTripToGoContent(localNote.content)) {
-      const serialized = serializeTripToGoContent(noteContent.text, tripParsed.data);
+      const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
+      const serialized = serializeTripToGoContent(baseContent, tripParsed.data);
       const updated = { ...localNote, content: serialized };
       setLocalNote(updated);
       if (user) await updateNote(localNote.id, user.id, { content: serialized });
