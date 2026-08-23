@@ -419,13 +419,26 @@ export function NoteEditor() {
                 {detectedLinks.map((url, idx) => {
                   let display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
                   if (display.length > 35) display = display.substring(0, 32) + '...';
+                  
+                  const handleOpenLink = async (e: React.MouseEvent) => {
+                    e.preventDefault();
+                    try {
+                      const { openUrl } = await import('@tauri-apps/plugin-opener');
+                      await openUrl(url);
+                    } catch {
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    }
+                  };
+
                   return (
                     <a
                       key={idx}
                       href={url}
+                      onClick={handleOpenLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 border border-stone-200 hover:border-stone-400 text-stone-800 text-xs font-medium rounded-lg transition-all shadow-2xs hover:shadow-xs group/link"
+                      title={`Open ${url}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 border border-stone-200 hover:border-stone-400 text-stone-800 text-xs font-medium rounded-lg transition-all shadow-2xs hover:shadow-xs group/link cursor-pointer"
                     >
                       <span className="truncate">{display}</span>
                       <ExternalLink size={11} className="text-stone-400 group-hover/link:text-stone-700 shrink-0" />
