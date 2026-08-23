@@ -5,13 +5,15 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu, FileText, Map, ExternalLink, Globe } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu, FileText, Map, ExternalLink, Globe, Fuel } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { ImageBlockView } from './ImageBlockView';
 import { TripToGoView } from './TripToGoView';
 import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent, TripToGoData } from '@/lib/triptogo';
+import { OilTravelView } from './OilTravelView';
+import { isOilTravelContent, parseOilTravelContent, serializeOilTravelContent, OilTravelData } from '@/lib/oiltravel';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 
 // Helper to extract URLs from text
@@ -59,9 +61,12 @@ export function NoteEditor() {
     if (localNote && dbNote.content !== localNote.content) {
       // Parse blocks from both sources
       const dbTripParsed = parseTripToGoContent(dbNote.content);
-      const dbParsed = parseNoteContent(dbTripParsed.text);
+      const dbOilParsed = parseOilTravelContent(dbTripParsed.text);
+      const dbParsed = parseNoteContent(dbOilParsed.text);
+
       const localTripParsed = parseTripToGoContent(localNote.content);
-      const localParsed = parseNoteContent(localTripParsed.text);
+      const localOilParsed = parseOilTravelContent(localTripParsed.text);
+      const localParsed = parseNoteContent(localOilParsed.text);
 
       // Check if blocks changed but text didn't (external block mutation)
       const dbBlocksJson = JSON.stringify(dbParsed.blocks);
@@ -70,9 +75,12 @@ export function NoteEditor() {
       if (dbBlocksJson !== localBlocksJson) {
         // Merge: keep local text, take db blocks
         const mergedBase = serializeNoteContent(localParsed.text, dbParsed.blocks);
-        const mergedContent = isTripToGoContent(localNote.content)
-          ? serializeTripToGoContent(mergedBase, localTripParsed.data)
+        let mergedContent = isOilTravelContent(localNote.content)
+          ? serializeOilTravelContent(mergedBase, localOilParsed.data)
           : mergedBase;
+        if (isTripToGoContent(localNote.content)) {
+          mergedContent = serializeTripToGoContent(mergedContent, localTripParsed.data);
+        }
         setLocalNote({ ...localNote, content: mergedContent });
       }
     }
@@ -234,16 +242,16 @@ export function NoteEditor() {
     }
   }, [selectedNoteId, allNotes, setSelectedNoteId]);
 
-  const [viewMode, setViewMode] = useState<'standard' | 'triptogo'>('standard');
+  const [viewMode, setViewMode] = useState<'standard' | 'triptogo' | 'oiltravel'>('standard');
 
   // When switching notes, always open in standard Notes mode by default
   useEffect(() => {
     setViewMode('standard');
   }, [localNote?.id]);
 
-
   const tripParsed = parseTripToGoContent(localNote?.content || '');
-  const noteContent = parseNoteContent(tripParsed.text);
+  const oilParsed = parseOilTravelContent(tripParsed.text);
+  const noteContent = parseNoteContent(oilParsed.text);
   const detectedLinks = useMemo(() => extractUrls(noteContent.text), [noteContent.text]);
 
   if (!selectedNoteId || !localNote) {
@@ -263,14 +271,27 @@ export function NoteEditor() {
   }
 
   const isTripMode = viewMode === 'triptogo';
+  const isOilMode = viewMode === 'oiltravel';
 
-  const handleToggleMode = async (mode: 'standard' | 'triptogo') => {
+  const handleToggleMode = async (mode: 'standard' | 'triptogo' | 'oiltravel') => {
     setViewMode(mode);
     if (!localNote) return;
     
     if (mode === 'triptogo' && !isTripToGoContent(localNote.content)) {
       const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
-      const serialized = serializeTripToGoContent(baseContent, tripParsed.data);
+      let contentWithOil = isOilTravelContent(localNote.content)
+        ? serializeOilTravelContent(baseContent, oilParsed.data)
+        : baseContent;
+      const serialized = serializeTripToGoContent(contentWithOil, tripParsed.data);
+      const updated = { ...localNote, content: serialized };
+      setLocalNote(updated);
+      if (user) await updateNote(localNote.id, user.id, { content: serialized });
+    } else if (mode === 'oiltravel' && !isOilTravelContent(localNote.content)) {
+      const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
+      let serialized = serializeOilTravelContent(baseContent, oilParsed.data);
+      if (isTripToGoContent(localNote.content)) {
+        serialized = serializeTripToGoContent(serialized, tripParsed.data);
+      }
       const updated = { ...localNote, content: serialized };
       setLocalNote(updated);
       if (user) await updateNote(localNote.id, user.id, { content: serialized });
@@ -279,19 +300,38 @@ export function NoteEditor() {
 
   const handleNoteTextChange = (newText: string) => {
     if (!localNote) return;
-    const isTrip = isTripToGoContent(localNote.content) || viewMode === 'triptogo';
     const baseContent = serializeNoteContent(newText, noteContent.blocks);
-    const serialized = isTrip
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let serialized = isOilTravelContent(localNote.content) || viewMode === 'oiltravel'
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(localNote.content) || viewMode === 'triptogo') {
+      serialized = serializeTripToGoContent(serialized, tripParsed.data);
+    }
       
     setLocalNote({ ...localNote, content: serialized });
   };
 
   const handleTripDataChange = (newData: TripToGoData) => {
     if (!localNote) return;
-    const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
+    let baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
+    if (isOilTravelContent(localNote.content)) {
+      baseContent = serializeOilTravelContent(baseContent, oilParsed.data);
+    }
     const serialized = serializeTripToGoContent(baseContent, newData);
+    const updated = { ...localNote, content: serialized };
+    setLocalNote(updated);
+    if (user) {
+      updateNote(localNote.id, user.id, { content: serialized }).catch(console.error);
+    }
+  };
+
+  const handleOilTravelDataChange = (newData: OilTravelData) => {
+    if (!localNote) return;
+    const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
+    let serialized = serializeOilTravelContent(baseContent, newData);
+    if (isTripToGoContent(localNote.content)) {
+      serialized = serializeTripToGoContent(serialized, tripParsed.data);
+    }
     const updated = { ...localNote, content: serialized };
     setLocalNote(updated);
     if (user) {
@@ -344,13 +384,13 @@ export function NoteEditor() {
             ))}
           </select>
 
-          {/* Mode Switcher: Note vs TripToGo */}
+          {/* Mode Switcher: Note vs TripToGo vs Oil Travel */}
           <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200/60 shrink-0">
             <button
               onClick={() => handleToggleMode('standard')}
               title="Standard Note Mode"
               className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
-                !isTripMode 
+                viewMode === 'standard'
                   ? 'bg-white text-stone-900 shadow-2xs font-semibold' 
                   : 'text-stone-500 hover:text-stone-800'
               }`}
@@ -362,13 +402,25 @@ export function NoteEditor() {
               onClick={() => handleToggleMode('triptogo')}
               title="TripToGo Flowchart Mode"
               className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
-                isTripMode 
+                viewMode === 'triptogo' 
                   ? 'bg-amber-500 text-white shadow-2xs font-semibold' 
                   : 'text-stone-500 hover:text-stone-800'
               }`}
             >
               <Map size={12} />
               <span>TripToGo</span>
+            </button>
+            <button
+              onClick={() => handleToggleMode('oiltravel')}
+              title="Oil Travel Mode"
+              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
+                viewMode === 'oiltravel'
+                  ? 'bg-orange-500 text-white shadow-2xs font-semibold' 
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              <Fuel size={12} />
+              <span>Oil Travel</span>
             </button>
           </div>
         </div>
@@ -403,7 +455,23 @@ export function NoteEditor() {
         </div>
       </div>
 
-      {isTripMode ? (
+      {isOilMode ? (
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-stone-50/40">
+          <div className="max-w-5xl mx-auto px-4 sm:px-8 pt-6">
+            <input
+              type="text"
+              value={localNote.title}
+              onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
+              placeholder="Fuel Log Title (e.g. 2026 Vehicle Refill Log)"
+              className="w-full text-2xl sm:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
+            />
+          </div>
+          <OilTravelView
+            data={oilParsed.data}
+            onChange={handleOilTravelDataChange}
+          />
+        </div>
+      ) : isTripMode ? (
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-stone-50/40">
           <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-6">
             <input
