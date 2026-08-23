@@ -279,23 +279,26 @@ export function NoteEditor() {
 
   return (
     <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
-      <div className="h-16 flex items-center justify-between px-3 sm:px-8 border-b border-stone-100 flex-shrink-0">
-        <div className="flex items-center space-x-2">
+      {/* Top Toolbar */}
+      <div className="min-h-14 sm:h-16 py-2 px-3 sm:px-8 flex items-center justify-between border-b border-stone-100 flex-shrink-0 bg-white/95 backdrop-blur-xs z-10 gap-2">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0 flex-1">
           {!isSidebarPinned && (
             <button
               onMouseEnter={() => setSidebarHovered(true)}
               onMouseDown={handleSidebarMouseDown}
               onMouseUp={handleSidebarMouseUp}
               onClick={toggleSidebarPin}
-              className="p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-md transition-all mr-1 shadow-xs active:scale-95 cursor-pointer"
+              title="Toggle notes sidebar"
+              className="p-2 sm:p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg sm:rounded-md transition-all shrink-0 shadow-2xs active:scale-95 cursor-pointer"
             >
               <Menu className="w-4 h-4" />
             </button>
           )}
+
           <select
             value={localNote.category_id || 'uncategorized'}
             onChange={(e) => updateCategory(e.target.value)}
-            className="text-xs font-medium text-stone-500 bg-transparent outline-none cursor-pointer hover:text-stone-800 transition-colors max-w-[120px] sm:max-w-none truncate"
+            className="text-xs font-medium text-stone-600 bg-stone-50 sm:bg-transparent border sm:border-transparent border-stone-200/70 rounded-md px-1.5 py-1 sm:p-0 outline-none cursor-pointer hover:text-stone-900 transition-colors max-w-[100px] xs:max-w-[130px] sm:max-w-none truncate shrink-0"
           >
             <option value="uncategorized">Uncategorized</option>
             {categories?.map(c => (
@@ -303,18 +306,19 @@ export function NoteEditor() {
             ))}
           </select>
 
-          <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200/60 ml-2">
+          {/* Mode Switcher: Note vs TripToGo */}
+          <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200/60 shrink-0">
             <button
               onClick={() => handleToggleMode('standard')}
               title="Standard Note Mode"
               className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
                 !isTripMode 
-                  ? 'bg-white text-stone-900 shadow-2xs' 
+                  ? 'bg-white text-stone-900 shadow-2xs font-semibold' 
                   : 'text-stone-500 hover:text-stone-800'
               }`}
             >
               <FileText size={12} />
-              <span className="hidden sm:inline">Note</span>
+              <span className="hidden xs:inline">Note</span>
             </button>
             <button
               onClick={() => handleToggleMode('triptogo')}
@@ -331,15 +335,17 @@ export function NoteEditor() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 sm:space-x-4 text-stone-400">
+        <div className="flex items-center space-x-1 sm:space-x-3 text-stone-400 shrink-0">
           <button
             onClick={toggleFeatured}
+            title="Feature this note"
             className={`p-2 rounded-full transition-colors ${localNote.is_featured ? 'text-amber-500 bg-amber-50' : 'hover:bg-stone-100'}`}
           >
             <Star className={`w-4 h-4 ${localNote.is_featured ? 'fill-amber-500' : ''}`} />
           </button>
           <button
             onClick={handleDeleteNote}
+            title="Delete note"
             className="p-2 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
@@ -350,7 +356,8 @@ export function NoteEditor() {
               onMouseDown={handleRightPanelMouseDown}
               onMouseUp={handleRightPanelMouseUp}
               onClick={toggleRightPanelPin}
-              className="p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-md transition-all shadow-xs active:scale-95 cursor-pointer"
+              title="Toggle panel"
+              className="p-2 sm:p-1.5 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg sm:rounded-md transition-all shadow-2xs active:scale-95 cursor-pointer"
             >
               <PanelRightOpen className="w-4 h-4" />
             </button>
