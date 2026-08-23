@@ -144,30 +144,30 @@ export function TripToGoView({ data, onChange }: Props) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-8 flex flex-col gap-6 select-none">
+    <div className="w-full max-w-4xl mx-auto px-3 sm:px-8 py-4 sm:py-8 flex flex-col gap-4 sm:gap-6 select-none">
       {/* Header Summary Banner */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border border-amber-200/80 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border border-amber-200/80 rounded-2xl p-3.5 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm font-semibold text-lg shrink-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm font-semibold text-base sm:text-lg shrink-0">
             🗺️
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-heading font-bold text-stone-800 tracking-tight">TripToGo Flowchart</h2>
-              <span className="text-[11px] font-semibold uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-300">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h2 className="text-sm sm:text-lg font-heading font-bold text-stone-800 tracking-tight">TripToGo Flowchart</h2>
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full border border-amber-300">
                 Itinerary Mode
               </span>
             </div>
-            <p className="text-xs text-stone-500 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-stone-500 mt-0.5">
               Plan and connect your travel route chronologically with interactive checkpoints.
             </p>
           </div>
         </div>
 
         {/* Progress Pill */}
-        <div className="flex items-center gap-3 bg-white/80 border border-amber-200/80 px-4 py-2 rounded-xl shadow-2xs shrink-0 self-stretch sm:self-auto justify-between sm:justify-start">
+        <div className="flex items-center gap-3 bg-white/90 border border-amber-200/80 px-3.5 py-1.5 sm:py-2 rounded-xl shadow-2xs shrink-0 self-stretch sm:self-auto justify-between sm:justify-start">
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400">Visited Progress</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-stone-400">Visited Progress</span>
             <span className="text-xs font-semibold text-stone-800">
               {visitedSpots} of {totalSpots} checkpoints ({progressPercent}%)
             </span>
@@ -199,7 +199,7 @@ export function TripToGoView({ data, onChange }: Props) {
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={() => setDragOverIndex(null)}
                 onDrop={(e) => handleDrop(e, index)}
-                className={`group relative w-full rounded-2xl border transition-all duration-200 p-4 sm:p-5 shadow-xs ${
+                className={`group relative w-full rounded-2xl border transition-all duration-200 p-3.5 sm:p-5 shadow-xs ${
                   node.isVisited 
                     ? 'bg-emerald-50/40 border-emerald-300 ring-1 ring-emerald-400/30' 
                     : `${catStyle.bg} ${catStyle.border} hover:border-stone-300 hover:shadow-sm`
@@ -209,14 +209,14 @@ export function TripToGoView({ data, onChange }: Props) {
                   isDragOver ? 'border-amber-500 ring-2 ring-amber-300 ring-offset-2' : ''
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
                   {/* Left: Grip Handle + Visited Checkbox + Place Info */}
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
                     <div 
                       title="Drag to reorder checkpoint"
                       className="p-1 cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-700 transition-colors mt-0.5 shrink-0"
                     >
-                      <GripVertical size={16} />
+                      <GripVertical size={15} />
                     </div>
 
                     {/* Visited Toggle Button */}
@@ -224,25 +224,25 @@ export function TripToGoView({ data, onChange }: Props) {
                       type="button"
                       onClick={() => handleToggleVisited(node.id)}
                       title={node.isVisited ? "Mark as unvisited" : "Mark as visited"}
-                      className="mt-0.5 shrink-0 transition-transform active:scale-90 cursor-pointer"
+                      className="mt-0.5 shrink-0 transition-transform active:scale-90 cursor-pointer p-0.5"
                     >
                       {node.isVisited ? (
-                        <CheckCircle2 size={22} className="text-emerald-600 fill-emerald-100" />
+                        <CheckCircle2 size={20} className="text-emerald-600 fill-emerald-100 sm:w-[22px] sm:h-[22px]" />
                       ) : (
-                        <Circle size={22} className="text-stone-300 hover:text-amber-500" />
+                        <Circle size={20} className="text-stone-300 hover:text-amber-500 sm:w-[22px] sm:h-[22px]" />
                       )}
                     </button>
 
                     {/* Place Name and Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1">
                         <span className="text-sm font-semibold">{catStyle.icon}</span>
                         <input
                           type="text"
                           value={node.name}
                           onChange={(e) => handleUpdateNode(node.id, { name: e.target.value })}
                           placeholder="Place or activity name..."
-                          className={`flex-1 min-w-[140px] text-base font-semibold bg-transparent outline-none border-b border-transparent hover:border-stone-300 focus:border-amber-500 transition-colors ${
+                          className={`flex-1 min-w-[120px] text-sm sm:text-base font-semibold bg-transparent outline-none border-b border-transparent hover:border-stone-300 focus:border-amber-500 transition-colors ${
                             node.isVisited ? 'text-emerald-950 line-through opacity-80' : 'text-stone-900'
                           }`}
                         />
