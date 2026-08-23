@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useStore';
 import { db } from '@/lib/db';
 import { parseNoteContent, serializeNoteContent, ImageBlock } from '@/lib/blocks';
 import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent } from '@/lib/triptogo';
+import { isOilTravelContent, parseOilTravelContent, serializeOilTravelContent } from '@/lib/oiltravel';
 
 
 function PasswordBlockDraggable() {
@@ -17,12 +18,16 @@ function PasswordBlockDraggable() {
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
     const tripParsed = parseTripToGoContent(note.content);
-    const content = parseNoteContent(tripParsed.text);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
     const newBlock = { id: crypto.randomUUID(), type: 'password' as const, value: '' };
     const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
-    const finalContent = isTripToGoContent(note.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let finalContent = isOilTravelContent(note.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(note.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
 
     await db.notes.update(selectedNoteId, {
       content: finalContent,
@@ -53,12 +58,16 @@ function PingBlockDraggable() {
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
     const tripParsed = parseTripToGoContent(note.content);
-    const content = parseNoteContent(tripParsed.text);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
     const newBlock = { id: crypto.randomUUID(), type: 'ping' as const, value: '' };
     const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
-    const finalContent = isTripToGoContent(note.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let finalContent = isOilTravelContent(note.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(note.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
 
     await db.notes.update(selectedNoteId, {
       content: finalContent,
@@ -93,12 +102,16 @@ function JobBlockDraggable() {
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
     const tripParsed = parseTripToGoContent(note.content);
-    const content = parseNoteContent(tripParsed.text);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
     const newBlock = { id: crypto.randomUUID(), type: 'job' as const, value: { totalTasks: 0, tasks: [] } };
     const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
-    const finalContent = isTripToGoContent(note.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let finalContent = isOilTravelContent(note.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(note.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
 
     await db.notes.update(selectedNoteId, {
       content: finalContent,
@@ -134,16 +147,20 @@ function ScheduleBlockDraggable() {
     const note = await db.notes.get(selectedNoteId);
     if (!note) return;
     const tripParsed = parseTripToGoContent(note.content);
-    const content = parseNoteContent(tripParsed.text);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
     const newBlock = { 
       id: crypto.randomUUID(), 
       type: 'schedule' as const, 
       value: { year: now.getFullYear(), month: now.getMonth(), dayDetails: {} } 
     };
     const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
-    const finalContent = isTripToGoContent(note.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let finalContent = isOilTravelContent(note.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(note.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
 
     await db.notes.update(selectedNoteId, {
       content: finalContent,
@@ -180,7 +197,8 @@ function PhotoUploadButton() {
       if (!note) return;
 
       const tripParsed = parseTripToGoContent(note.content);
-      const noteContent = parseNoteContent(tripParsed.text);
+      const oilParsed = parseOilTravelContent(tripParsed.text);
+      const noteContent = parseNoteContent(oilParsed.text);
       const newImageBlock: ImageBlock = {
         id: crypto.randomUUID(),
         type: 'image',
@@ -190,9 +208,12 @@ function PhotoUploadButton() {
 
       const newBlocks = [...noteContent.blocks, newImageBlock];
       const baseContent = serializeNoteContent(noteContent.text, newBlocks);
-      const finalContent = isTripToGoContent(note.content)
-        ? serializeTripToGoContent(baseContent, tripParsed.data)
+      let finalContent = isOilTravelContent(note.content)
+        ? serializeOilTravelContent(baseContent, oilParsed.data)
         : baseContent;
+      if (isTripToGoContent(note.content)) {
+        finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+      }
 
       await db.notes.update(selectedNoteId, {
         content: finalContent,

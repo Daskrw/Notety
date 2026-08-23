@@ -100,19 +100,33 @@ export function NoteEditor() {
       const rect = editorRef.current.getBoundingClientRect();
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
 
-      const parsed = parseNoteContent(current.content);
+      const tripParsed = parseTripToGoContent(current.content);
+      const oilParsed = parseOilTravelContent(tripParsed.text);
+      const parsed = parseNoteContent(oilParsed.text);
+
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id);
+      if (!isTemplate && parsed.blocks.some(b => b.id === payload.id)) {
+        return;
+      }
+
       const droppedBlock: EditorBlock = {
-        id: ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id)
-          ? crypto.randomUUID()
-          : payload.id,
+        id: isTemplate ? crypto.randomUUID() : payload.id,
         type: payload.type,
         value: payload.value,
       };
 
       const newBlocks = [...parsed.blocks, droppedBlock];
+      const baseContent = serializeNoteContent(parsed.text, newBlocks);
+      let finalContent = isOilTravelContent(current.content)
+        ? serializeOilTravelContent(baseContent, oilParsed.data)
+        : baseContent;
+      if (isTripToGoContent(current.content)) {
+        finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+      }
+
       setLocalNote({
         ...current,
-        content: serializeNoteContent(parsed.text, newBlocks),
+        content: finalContent,
       });
       if (!isRightPanelOpen) {
         toggleRightPanel();
@@ -145,26 +159,44 @@ export function NoteEditor() {
 
   const updateImageCaption = (id: string, caption: string) => {
     if (!localNote) return;
-    const content = parseNoteContent(localNote.content);
+    const tripParsed = parseTripToGoContent(localNote.content);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
     const newBlocks = content.blocks.map(b => {
       if (b.id === id && b.type === 'image') {
         return { ...b, caption };
       }
       return b;
     });
+    const baseContent = serializeNoteContent(content.text, newBlocks);
+    let finalContent = isOilTravelContent(localNote.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
+      : baseContent;
+    if (isTripToGoContent(localNote.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
     setLocalNote({
       ...localNote,
-      content: serializeNoteContent(content.text, newBlocks)
+      content: finalContent
     });
   };
 
   const removeImageBlock = (id: string) => {
     if (!localNote) return;
-    const content = parseNoteContent(localNote.content);
+    const tripParsed = parseTripToGoContent(localNote.content);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
     const newBlocks = content.blocks.filter(b => b.id !== id);
+    const baseContent = serializeNoteContent(content.text, newBlocks);
+    let finalContent = isOilTravelContent(localNote.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
+      : baseContent;
+    if (isTripToGoContent(localNote.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
     setLocalNote({
       ...localNote,
-      content: serializeNoteContent(content.text, newBlocks)
+      content: finalContent
     });
   };
 
@@ -185,8 +217,17 @@ export function NoteEditor() {
           e.preventDefault();
           const start = cursor - match[0].length;
           const newText = text.slice(0, start) + snippet.content + text.slice(cursor);
-          const parsed = parseNoteContent(localNote?.content || '');
-          setLocalNote({ ...localNote!, content: serializeNoteContent(newText, parsed.blocks) });
+          const tripParsed = parseTripToGoContent(localNote?.content || '');
+          const oilParsed = parseOilTravelContent(tripParsed.text);
+          const parsed = parseNoteContent(oilParsed.text);
+          const baseContent = serializeNoteContent(newText, parsed.blocks);
+          let finalContent = isOilTravelContent(localNote?.content || '')
+            ? serializeOilTravelContent(baseContent, oilParsed.data)
+            : baseContent;
+          if (isTripToGoContent(localNote?.content || '')) {
+            finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+          }
+          setLocalNote({ ...localNote!, content: finalContent });
           setTimeout(() => {
             textarea.selectionStart = textarea.selectionEnd = start + snippet.content.length;
           }, 0);
@@ -209,16 +250,25 @@ export function NoteEditor() {
           reader.onload = (ev) => {
             const dataUrl = ev.target?.result as string;
             if (dataUrl) {
-              const content = parseNoteContent(localNote.content);
+              const tripParsed = parseTripToGoContent(localNote.content);
+              const oilParsed = parseOilTravelContent(tripParsed.text);
+              const content = parseNoteContent(oilParsed.text);
               const newImage: ImageBlock = {
                 id: crypto.randomUUID(),
                 type: 'image',
                 url: dataUrl,
                 caption: ''
               };
+              const baseContent = serializeNoteContent(content.text, [...content.blocks, newImage]);
+              let finalContent = isOilTravelContent(localNote.content)
+                ? serializeOilTravelContent(baseContent, oilParsed.data)
+                : baseContent;
+              if (isTripToGoContent(localNote.content)) {
+                finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+              }
               setLocalNote({
                 ...localNote,
-                content: serializeNoteContent(content.text, [...content.blocks, newImage])
+                content: finalContent
               });
             }
           };

@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 import { parseNoteContent, serializeNoteContent } from '@/lib/blocks';
 import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent } from '@/lib/triptogo';
+import { isOilTravelContent, parseOilTravelContent, serializeOilTravelContent } from '@/lib/oiltravel';
 import { PasswordBlockView } from './PasswordBlockView';
 import { PingBlockView } from './PingBlockView';
 import { JobBlockView } from './JobBlockView';
@@ -50,7 +51,8 @@ export function RightPanel() {
       if (!note) return;
 
       const tripParsed = parseTripToGoContent(note.content);
-      const noteContent = parseNoteContent(tripParsed.text);
+      const oilParsed = parseOilTravelContent(tripParsed.text);
+      const noteContent = parseNoteContent(oilParsed.text);
       const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id);
 
       // If it's an existing block already in the note, do not duplicate
@@ -66,9 +68,12 @@ export function RightPanel() {
 
       const newBlocks = [...noteContent.blocks, droppedBlock];
       const baseContent = serializeNoteContent(noteContent.text, newBlocks);
-      const finalContent = isTripToGoContent(note.content)
-        ? serializeTripToGoContent(baseContent, tripParsed.data)
+      let finalContent = isOilTravelContent(note.content)
+        ? serializeOilTravelContent(baseContent, oilParsed.data)
         : baseContent;
+      if (isTripToGoContent(note.content)) {
+        finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+      }
 
       await db.notes.update(noteId, {
         content: finalContent,
@@ -84,8 +89,11 @@ export function RightPanel() {
   const highlights = useLiveQuery(
     async () => {
       if (!selectedNoteId) return [];
-      const items = await db.highlights.where('note_id').equals(selectedNoteId).toArray();
-      return items.sort((a, b) => b.created_at - a.created_at);
+      return db.highlights
+        .where('note_id')
+        .equals(selectedNoteId)
+        .reverse()
+        .sortBy('created_at');
     },
     [selectedNoteId]
   );
@@ -112,7 +120,8 @@ export function RightPanel() {
   const updateBlock = async (index: number, val: any) => {
     if (!localNote || !user) return;
     const tripParsed = parseTripToGoContent(localNote.content);
-    const noteContent = parseNoteContent(tripParsed.text);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const noteContent = parseNoteContent(oilParsed.text);
     const newBlocks = [...noteContent.blocks];
     const current = newBlocks[index];
     if (!current) return;
@@ -124,9 +133,12 @@ export function RightPanel() {
     }
     
     const baseContent = serializeNoteContent(noteContent.text, newBlocks);
-    const finalContent = isTripToGoContent(localNote.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let finalContent = isOilTravelContent(localNote.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(localNote.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
 
     await db.notes.update(localNote.id, {
       content: finalContent,
@@ -137,13 +149,17 @@ export function RightPanel() {
   const removeBlock = async (index: number) => {
     if (!localNote || !user) return;
     const tripParsed = parseTripToGoContent(localNote.content);
-    const noteContent = parseNoteContent(tripParsed.text);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const noteContent = parseNoteContent(oilParsed.text);
     const newBlocks = noteContent.blocks.filter((_, i) => i !== index);
 
     const baseContent = serializeNoteContent(noteContent.text, newBlocks);
-    const finalContent = isTripToGoContent(localNote.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let finalContent = isOilTravelContent(localNote.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(localNote.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
 
     await db.notes.update(localNote.id, {
       content: finalContent,
@@ -197,9 +213,12 @@ export function RightPanel() {
     setDraggedBlockIndex(null);
 
     const baseContent = serializeNoteContent(noteContent.text, currentBlocks);
-    const serialized = isTripToGoContent(localNote.content)
-      ? serializeTripToGoContent(baseContent, tripParsed.data)
+    let serialized = isOilTravelContent(localNote.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
+    if (isTripToGoContent(localNote.content)) {
+      serialized = serializeTripToGoContent(serialized, tripParsed.data);
+    }
 
     await db.notes.update(localNote.id, {
       content: serialized,
@@ -208,7 +227,8 @@ export function RightPanel() {
   };
 
   const tripParsed = parseTripToGoContent(localNote?.content || '');
-  const noteContent = parseNoteContent(tripParsed.text);
+  const oilParsed = parseOilTravelContent(tripParsed.text);
+  const noteContent = parseNoteContent(oilParsed.text);
 
   return (
     <>
