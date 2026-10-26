@@ -1,13 +1,20 @@
 import { useState } from 'react';
-import { Briefcase, GripVertical, CheckCircle2, Circle, RotateCcw, Plus, Trash2 } from 'lucide-react';
+import { Briefcase, GripVertical, CheckCircle2, Circle, RotateCcw, Plus, Trash2, Clock, Copy } from 'lucide-react';
 import { JobBlock, JobBlockValue, JobTaskItem } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 import { useAppStore } from '@/store/useStore';
+import { 
+  applyFirstEntryTimestamp, 
+  formatFirstEntryTimestamp, 
+  formatFullFirstEntryDateTime, 
+  duplicateJobTask 
+} from '@/lib/job';
 
 interface Props {
   block: JobBlock;
   onChange: (val: JobBlockValue) => void;
   onRemove: () => void;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
 function ProgressCircle({ completed, total }: { completed: number; total: number }) {
@@ -48,7 +55,7 @@ function ProgressCircle({ completed, total }: { completed: number; total: number
   );
 }
 
-export function JobBlockView({ block, onChange, onRemove }: Props) {
+export function JobBlockView({ block, onChange, onRemove, dragHandleProps }: Props) {
   const { setConfirmConfig } = useAppStore();
   const { onMouseDown } = useDraggableBlock(
     { id: block.id, type: 'job', value: block.value },
@@ -93,8 +100,30 @@ export function JobBlockView({ block, onChange, onRemove }: Props) {
   };
 
   const handleTaskTextChange = (index: number, text: string) => {
+    const currentTask = tasks[index];
+    if (!currentTask) return;
+
+    const firstEntryAt = applyFirstEntryTimestamp(
+      currentTask.text,
+      text,
+      currentTask.firstEntryAt
+    );
+
     const newTasks = [...tasks];
-    newTasks[index] = { ...newTasks[index], text };
+    newTasks[index] = { 
+      ...currentTask, 
+      text,
+      firstEntryAt
+    };
+    onChange({ totalTasks: newTasks.length, tasks: newTasks });
+  };
+
+  const handleDuplicateTask = (index: number) => {
+    const target = tasks[index];
+    if (!target) return;
+    const duplicated = duplicateJobTask(target);
+    const newTasks = [...tasks];
+    newTasks.splice(index + 1, 0, duplicated);
     onChange({ totalTasks: newTasks.length, tasks: newTasks });
   };
 
@@ -132,12 +161,14 @@ export function JobBlockView({ block, onChange, onRemove }: Props) {
       <div className="group relative flex flex-col bg-blue-50/70 border border-blue-200 rounded-lg overflow-hidden my-1.5 w-full shadow-sm">
         <div className="flex items-center justify-between bg-blue-100/50 border-b border-blue-200/60 px-2 py-1.5">
           <div className="flex items-center gap-1.5">
-            <div 
-              className="p-1 cursor-grab active:cursor-grabbing text-blue-600 hover:text-blue-800 transition-colors select-none shrink-0"
-              onMouseDown={onMouseDown}
-            >
-              <GripVertical size={14} />
-            </div>
+            {dragHandleProps && (
+              <div 
+                {...dragHandleProps}
+                className="p-1 cursor-grab active:cursor-grabbing text-blue-600 hover:text-blue-800 transition-colors select-none shrink-0"
+              >
+                <GripVertical size={14} />
+              </div>
+            )}
             <Briefcase size={15} className="text-blue-700" />
             <span className="text-xs font-semibold text-blue-900">Job Setup</span>
           </div>
@@ -182,12 +213,19 @@ export function JobBlockView({ block, onChange, onRemove }: Props) {
         isComplete ? 'bg-green-100/50 border-green-200/60' : 'bg-blue-100/50 border-blue-200/60'
       }`}>
         <div className="flex items-center gap-1.5">
-          <div 
-            className="p-1 cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-700 transition-colors select-none shrink-0"
-            onMouseDown={onMouseDown}
-          >
-            <GripVertical size={14} />
-          </div>
+          {dragHandleProps && (
+            <div 
+              {...dragHandleProps}
+              className="p-1 cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-700 transition-colors select-none shrink-0"
+              onMouseDown={(e) => {
+                if (!dragHandleProps) {
+                  onMouseDown(e);
+                }
+              }}
+            >
+              <GripVertical size={14} />
+            </div>
+          )}
           <Briefcase size={15} className={isComplete ? 'text-green-700' : 'text-blue-700'} />
           <span className={`text-xs font-semibold ${isComplete ? 'text-green-900' : 'text-blue-900'}`}>
             Job ({completedCount}/{tasks.length})
@@ -256,43 +294,86 @@ export function JobBlockView({ block, onChange, onRemove }: Props) {
       <div className="p-2 flex flex-col gap-1.5 bg-white/70 max-h-72 overflow-y-auto custom-scrollbar">
         {tasks.map((task, idx) => {
           const isDone = !!task.completed;
+          const hasTimestamp = !!task.firstEntryAt;
+          const formattedTime = formatFirstEntryTimestamp(task.firstEntryAt);
+          const fullTime = formatFullFirstEntryDateTime(task.firstEntryAt);
+
           return (
-            <div key={task.id || idx} className={`group/item flex items-center gap-2 px-2 py-1 border rounded-md shadow-2xs transition-colors ${
-              isDone ? 'bg-green-50/80 border-green-200' : 'bg-white/80 border-stone-100'
-            }`}>
-              <span className="text-[10px] font-mono font-medium text-stone-400 w-5 shrink-0">#{idx + 1}</span>
-              
-              {/* Clickable Circle to track progress */}
-              <button
-                type="button"
-                onClick={() => handleToggleTaskComplete(idx)}
-                title={isDone ? "Mark as uncompleted" : "Click to complete task"}
-                className="shrink-0 p-0.5 hover:scale-110 transition-transform cursor-pointer"
-              >
-                {isDone ? (
-                  <CheckCircle2 size={15} className="text-green-600" />
+            <div 
+              key={task.id || idx} 
+              className={`group/item flex flex-col gap-1 px-2.5 py-1.5 border rounded-md shadow-2xs transition-colors ${
+                isDone ? 'bg-green-50/80 border-green-200' : 'bg-white/80 border-stone-100 hover:border-stone-200'
+              }`}
+            >
+              {/* Main Subtask Row: Number, Checkbox, Text input, Actions */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-medium text-stone-400 w-5 shrink-0">#{idx + 1}</span>
+                
+                {/* Clickable Circle to track progress */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleTaskComplete(idx)}
+                  title={isDone ? "Mark as uncompleted" : "Click to complete task"}
+                  className="shrink-0 p-0.5 hover:scale-110 transition-transform cursor-pointer"
+                >
+                  {isDone ? (
+                    <CheckCircle2 size={15} className="text-green-600" />
+                  ) : (
+                    <Circle size={15} className="text-stone-300 hover:text-blue-500" />
+                  )}
+                </button>
+
+                <input
+                  type="text"
+                  value={task.text}
+                  onChange={(e) => handleTaskTextChange(idx, e.target.value)}
+                  placeholder={`Task ${idx + 1}...`}
+                  className={`flex-1 bg-transparent outline-none text-xs font-sans transition-colors ${
+                    isDone ? 'text-green-900 font-medium line-through opacity-80' : 'text-stone-700 placeholder:text-stone-300'
+                  }`}
+                />
+
+                {/* Subtask actions: Duplicate & Delete */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicateTask(idx)}
+                    title="Duplicate this task"
+                    className="opacity-0 group-hover/item:opacity-100 p-0.5 text-stone-300 hover:text-blue-600 transition-opacity"
+                  >
+                    <Copy size={11} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTask(idx)}
+                    title="Delete this task"
+                    className="opacity-0 group-hover/item:opacity-100 p-0.5 text-stone-300 hover:text-red-500 transition-opacity"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Subtask Meta Row: First-entry timestamp */}
+              <div className="flex items-center justify-between pl-7 pr-1">
+                {hasTimestamp ? (
+                  <div 
+                    title={fullTime}
+                    className="inline-flex items-center gap-1 text-[10px] text-stone-400 hover:text-stone-600 transition-colors cursor-help select-none"
+                  >
+                    <Clock size={10} className="text-stone-400 shrink-0" />
+                    <span className="font-sans">{formattedTime}</span>
+                  </div>
                 ) : (
-                  <Circle size={15} className="text-stone-300 hover:text-blue-500" />
+                  <div 
+                    title="ยังไม่มีการบันทึกข้อความสำหรับงานย่อยนี้"
+                    className="hidden group-hover/item:inline-flex items-center gap-1 text-[9px] text-stone-300 italic select-none"
+                  >
+                    <Clock size={9} className="opacity-50 shrink-0" />
+                    <span>ยังไม่มีการบันทึก</span>
+                  </div>
                 )}
-              </button>
-
-              <input
-                type="text"
-                value={task.text}
-                onChange={(e) => handleTaskTextChange(idx, e.target.value)}
-                placeholder={`Task ${idx + 1}...`}
-                className={`flex-1 bg-transparent outline-none text-xs font-sans transition-colors ${
-                  isDone ? 'text-green-900 font-medium line-through opacity-80' : 'text-stone-700 placeholder:text-stone-300'
-                }`}
-              />
-
-              <button
-                onClick={() => handleDeleteTask(idx)}
-                title="Delete this task"
-                className="opacity-0 group-hover/item:opacity-100 p-0.5 text-stone-300 hover:text-red-500 transition-opacity"
-              >
-                <Trash2 size={12} />
-              </button>
+              </div>
             </div>
           );
         })}

@@ -51,11 +51,25 @@ export interface UserActivity {
   last_active_at: string;
 }
 
+export interface NoteAsset {
+  id: string;
+  data: Blob;
+  mime_type: string;
+  filename?: string;
+  size: number;
+  created_at: number;
+  user_id?: string;
+  sync_status?: 'synced' | 'pending' | 'uploading' | 'failed';
+  remote_path?: string;
+  synced_at?: number;
+}
+
 const db = new Dexie('QuietNotesDB') as Dexie & {
   categories: EntityTable<Category, 'id'>;
   notes: EntityTable<Note, 'id'>;
   snippets: EntityTable<Snippet, 'id'>;
   highlights: EntityTable<Highlight, 'id'>;
+  assets: EntityTable<NoteAsset, 'id'>;
 };
 
 // Versions 1-4 are kept for migration history only.
@@ -108,4 +122,15 @@ db.version(7).stores({
   return tx.table('snippets').toCollection().modify((s: any) => { });
 });
 
+// v8: Add assets table for binary image persistence
+db.version(8).stores({
+  assets: 'id, created_at, user_id',
+});
+
+// v9: Add sync_status to assets index for offline retry queue and syncing
+db.version(9).stores({
+  assets: 'id, created_at, user_id, sync_status',
+});
+
 export { db };
+

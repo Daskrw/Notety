@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore, useAppStore } from '../store/useStore';
 import { loadUserData } from '../lib/data';
 import { db } from '../lib/db';
+import { migrateExistingImages, syncPendingAssets, clearUserAssetMemoryCache } from '../lib/assets';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore((state) => state.setUser);
@@ -20,6 +21,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasLoadedData.current = true;
         loadUserData(session.user.id);
         fetchProfile(session.user.id);
+        migrateExistingImages(session.user.id).catch(() => {});
+        syncPendingAssets(session.user.id).catch(() => {});
       }
     });
 
@@ -30,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hasLoadedData.current = true;
           await loadUserData(session.user.id);
           await fetchProfile(session.user.id);
+          migrateExistingImages(session.user.id).catch(() => {});
+          syncPendingAssets(session.user.id).catch(() => {});
         }
       }
 
@@ -37,7 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasLoadedData.current = false;
         setUser(null);
         setUserProfile(null);
-        // Clear local cache on sign out
+        clearUserAssetMemoryCache();
+        // Clear local cache on sign out, preserving any unsynced local assets
         try {
           await Promise.all([
             db.notes.clear(),

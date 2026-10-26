@@ -7,9 +7,10 @@ interface Props {
   block: PingBlock;
   onChange: (val: string) => void;
   onRemove: () => void;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
-export function PingBlockView({ block, onChange, onRemove }: Props) {
+export function PingBlockView({ block, onChange, onRemove, dragHandleProps }: Props) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const { onMouseDown } = useDraggableBlock(
@@ -69,12 +70,14 @@ export function PingBlockView({ block, onChange, onRemove }: Props) {
     <div className="group relative flex flex-col bg-green-50/70 border border-green-200 rounded-lg overflow-hidden my-1.5 w-full shadow-sm transition-all hover:border-green-300">
       {/* Upper: Input & Controls */}
       <div className="flex items-center bg-green-100/50 border-b border-green-200/60 px-1 py-0.5">
-        <div 
-          className="px-1.5 py-1.5 cursor-grab active:cursor-grabbing text-green-600 hover:text-green-800 transition-colors select-none shrink-0"
-          onMouseDown={onMouseDown}
-        >
-          <GripVertical size={14} />
-        </div>
+        {dragHandleProps && (
+          <div 
+            {...dragHandleProps}
+            className="px-1.5 py-1.5 cursor-grab active:cursor-grabbing text-green-600 hover:text-green-800 transition-colors select-none shrink-0"
+          >
+            <GripVertical size={14} />
+          </div>
+        )}
         <div className="flex items-center justify-center p-1 text-green-700 shrink-0">
           <Activity size={14} />
         </div>

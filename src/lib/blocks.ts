@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule';
+export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule' | 'testtem';
 
 export interface BaseBlock {
   id: string;
@@ -24,6 +24,7 @@ export interface JobTaskItem {
   id: string;
   text: string;
   completed?: boolean;
+  firstEntryAt?: string;
 }
 
 export interface JobBlockValue {
@@ -47,6 +48,7 @@ export interface ScheduleDayDetail {
   category: 'holiday' | 'work' | 'off' | 'custom';
   title?: string;
   shiftTimes?: string;
+  color?: string;
 }
 
 export interface ScheduleBlockValue {
@@ -60,7 +62,23 @@ export interface ScheduleBlock extends BaseBlock {
   value: ScheduleBlockValue | string;
 }
 
-export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock;
+export interface TestTemSegment {
+  type: 'text' | 'field';
+  id: string;
+  text?: string;
+  placeholder?: string;
+}
+
+export interface TestTemBlockValue {
+  segments: TestTemSegment[];
+}
+
+export interface TestTemBlock extends BaseBlock {
+  type: 'testtem';
+  value: TestTemBlockValue | string;
+}
+
+export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock | TestTemBlock;
 
 export interface NoteContent {
   text: string;

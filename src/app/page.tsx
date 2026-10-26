@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/useStore';
+import { useAuthStore, useAppStore } from '@/store/useStore';
 import { Sidebar } from '@/components/Sidebar';
 import { NoteEditor } from '@/components/NoteEditor';
 import { Login } from '@/components/Login';
@@ -10,6 +10,7 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EditCategoryModal } from '@/components/EditCategoryModal';
 import { ProfilePanel } from '@/components/ProfilePanel';
+import { listenAudioInterruption, nativeHideAll, loadSavedBrowserState, nativePauseMedia } from '@/lib/browser';
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -17,6 +18,36 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+
+    let unlisten: (() => void) | undefined;
+    let isMounted = true;
+
+    listenAudioInterruption(() => {
+      if (!isMounted) return;
+      // 1. Pause any background Devtool media across child WebViews
+      nativePauseMedia().catch(console.warn);
+
+      // 2. Ensure mode transitions to 'notes', preserving editor text and caret
+      const currentMode = useAppStore.getState().appMode;
+      useAppStore.getState().setAppMode('notes');
+
+      // 3. Cleanly hide Devtool child WebViews without destroying them
+      if (currentMode !== 'notes') {
+        try {
+          const saved = loadSavedBrowserState();
+          if (saved && saved.tabs) {
+            nativeHideAll(saved.tabs.map((t) => t.id));
+          }
+        } catch {}
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      isMounted = false;
+      if (unlisten) unlisten();
+    };
   }, []);
 
   if (!mounted) {

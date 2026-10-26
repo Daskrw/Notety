@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { createHighlight, deleteHighlight } from '@/lib/data';
-import { PanelRightClose, Plus, FileText, Trash2, Layers, Sparkles, Pin, PinOff } from 'lucide-react';
+import { PanelRightClose, Plus, FileText, Trash2, Layers, Sparkles, Pin, PinOff, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
 import { parseNoteContent, serializeNoteContent } from '@/lib/blocks';
@@ -14,6 +14,7 @@ import { PasswordBlockView } from './PasswordBlockView';
 import { PingBlockView } from './PingBlockView';
 import { JobBlockView } from './JobBlockView';
 import { ScheduleBlockView } from './ScheduleBlockView';
+import { TestTemBlockView } from './TestTemBlockView';
 
 export function RightPanel() {
   const { 
@@ -53,7 +54,7 @@ export function RightPanel() {
       const tripParsed = parseTripToGoContent(note.content);
       const oilParsed = parseOilTravelContent(tripParsed.text);
       const noteContent = parseNoteContent(oilParsed.text);
-      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id);
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem'].includes(payload.id);
 
       // If it's an existing block already in the note, do not duplicate
       if (!isTemplate && noteContent.blocks.some(b => b.id === payload.id)) {
@@ -167,50 +168,14 @@ export function RightPanel() {
     });
   };
 
-  // Drag and drop reordering for existing blocks in RightPanel
-  const [draggedBlockIndex, setDraggedBlockIndex] = useState<number | null>(null);
-  const [dragOverBlockIndex, setDragOverBlockIndex] = useState<number | null>(null);
-
-  const handleBlockDragStart = (e: React.DragEvent, index: number) => {
-    const b = noteContent.blocks[index];
-    const val = 'value' in b ? b.value : '';
-    e.dataTransfer.setData('application/json', JSON.stringify({
-      id: b.id,
-      type: b.type,
-      value: val
-    }));
-    e.dataTransfer.setData('text/plain', String(index));
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggedBlockIndex(index);
-  };
-
-  const handleBlockDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverBlockIndex !== index) {
-      setDragOverBlockIndex(index);
-    }
-  };
-
-  const handleBlockDragLeave = () => {
-    setDragOverBlockIndex(null);
-  };
-
-  const handleBlockDrop = async (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOverBlockIndex(null);
-
-    if (draggedBlockIndex === null || draggedBlockIndex === targetIndex || !localNote) {
-      setDraggedBlockIndex(null);
-      return;
-    }
-
+  // Explicit block reordering: Move Up / Move Down
+  const moveBlock = async (fromIndex: number, toIndex: number) => {
+    if (!localNote || fromIndex === toIndex) return;
     const currentBlocks = [...noteContent.blocks];
-    const [movedBlock] = currentBlocks.splice(draggedBlockIndex, 1);
-    currentBlocks.splice(targetIndex, 0, movedBlock);
+    if (fromIndex < 0 || fromIndex >= currentBlocks.length || toIndex < 0 || toIndex >= currentBlocks.length) return;
 
-    setDraggedBlockIndex(null);
+    const [movedBlock] = currentBlocks.splice(fromIndex, 1);
+    currentBlocks.splice(toIndex, 0, movedBlock);
 
     const baseContent = serializeNoteContent(noteContent.text, currentBlocks);
     let serialized = isOilTravelContent(localNote.content)
@@ -356,59 +321,118 @@ export function RightPanel() {
             </>
           ) : (
             /* Interactive Blocks list */
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar">
               {noteContent.blocks.map((block, index) => {
-                const isBeingDragged = draggedBlockIndex === index;
-                const isDragOver = dragOverBlockIndex === index;
+                const canMoveUp = index > 0;
+                const canMoveDown = index < noteContent.blocks.length - 1;
+
+                const getBlockLabel = (type: string) => {
+                  switch (type) {
+                    case 'password': return 'Password Box';
+                    case 'ping': return 'Ping Signal';
+                    case 'job': return 'Job Progress';
+                    case 'schedule': return 'Work Schedule';
+                    case 'testtem': return 'TestTem Template';
+                    default: return 'Block';
+                  }
+                };
 
                 return (
                   <div 
                     key={block.id} 
-                    onDragOver={(e) => handleBlockDragOver(e, index)}
-                    onDragLeave={handleBlockDragLeave}
-                    onDrop={(e) => handleBlockDrop(e, index)}
-                    className={`relative bg-white rounded-xl p-1 border transition-all duration-150 ${
-                      isBeingDragged 
-                        ? 'opacity-40 scale-95 border-dashed border-stone-400' 
-                        : isDragOver
-                        ? 'border-blue-500 ring-2 ring-blue-300 ring-offset-1 shadow-md -translate-y-0.5'
-                        : 'border-stone-100 hover:border-stone-200 shadow-sm'
-                    }`}
+                    className="relative bg-white rounded-xl border border-stone-200/90 shadow-xs hover:border-stone-300 transition-all flex flex-col group/card overflow-hidden"
                   >
-                    {block.type === 'password' && (
-                      <PasswordBlockView 
-                        block={block}
-                        onChange={(val) => updateBlock(index, val)}
-                        onRemove={() => removeBlock(index)}
-                      />
-                    )}
-                    {block.type === 'ping' && (
-                      <PingBlockView 
-                        block={block}
-                        onChange={(val) => updateBlock(index, val)}
-                        onRemove={() => removeBlock(index)}
-                      />
-                    )}
-                    {block.type === 'job' && (
-                      <JobBlockView 
-                        block={block as any}
-                        onChange={(val) => updateBlock(index, val)}
-                        onRemove={() => removeBlock(index)}
-                      />
-                    )}
-                    {block.type === 'schedule' && (
-                      <ScheduleBlockView 
-                        block={block as any}
-                        onChange={(val) => updateBlock(index, val)}
-                        onRemove={() => removeBlock(index)}
-                      />
-                    )}
+                    {/* Block Order Controls Bar */}
+                    <div className="flex items-center justify-between px-2.5 py-1.5 bg-stone-50/90 border-b border-stone-200/60 text-xs">
+                      <div className="flex items-center gap-1.5 text-stone-600 font-medium text-[11px] uppercase tracking-wider">
+                        <span className="font-semibold text-stone-800">{getBlockLabel(block.type)}</span>
+                        <span className="text-stone-400 font-mono text-[10px]">#{index + 1}</span>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (canMoveUp) moveBlock(index, index - 1);
+                          }}
+                          disabled={!canMoveUp}
+                          title="Move up"
+                          aria-label="Move up"
+                          className="p-1 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-200/80 disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronUp size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (canMoveDown) moveBlock(index, index + 1);
+                          }}
+                          disabled={!canMoveDown}
+                          title="Move down"
+                          aria-label="Move down"
+                          className="p-1 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-200/80 disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronDown size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeBlock(index);
+                          }}
+                          title="Delete block"
+                          aria-label="Delete block"
+                          className="p-1 rounded text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors ml-0.5"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-1">
+                      {block.type === 'password' && (
+                        <PasswordBlockView 
+                          block={block}
+                          onChange={(val) => updateBlock(index, val)}
+                          onRemove={() => removeBlock(index)}
+                        />
+                      )}
+                      {block.type === 'ping' && (
+                        <PingBlockView 
+                          block={block}
+                          onChange={(val) => updateBlock(index, val)}
+                          onRemove={() => removeBlock(index)}
+                        />
+                      )}
+                      {block.type === 'job' && (
+                        <JobBlockView 
+                          block={block as any}
+                          onChange={(val) => updateBlock(index, val)}
+                          onRemove={() => removeBlock(index)}
+                        />
+                      )}
+                      {block.type === 'schedule' && (
+                        <ScheduleBlockView 
+                          block={block as any}
+                          onChange={(val) => updateBlock(index, val)}
+                          onRemove={() => removeBlock(index)}
+                        />
+                      )}
+                      {block.type === 'testtem' && (
+                        <TestTemBlockView 
+                          block={block as any}
+                          onChange={(val) => updateBlock(index, val)}
+                          onRemove={() => removeBlock(index)}
+                        />
+                      )}
+                    </div>
                   </div>
                 );
               })}
               
               {noteContent.blocks.length === 0 && (
-                <p className="text-center text-stone-400 text-sm py-8 italic">No active blocks. Drag a block here from the toolbar to add it!</p>
+                <p className="text-center text-stone-400 text-sm py-8 italic">No active blocks. Click a block in the toolbar to add it!</p>
               )}
             </div>
           )}

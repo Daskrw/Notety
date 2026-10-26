@@ -1,10 +1,10 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note, Category } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
-import { createNote, createCategory, deleteCategory, updateCategoryOrder, updateNote } from '@/lib/data';
-import { Plus, Star, Menu, Settings, Search, Folder, ChevronDown, ChevronRight, Trash2, Edit2, Pin, PinOff } from 'lucide-react';
+import { createNote, createCategory, deleteCategory, updateCategoryOrder } from '@/lib/data';
+import { Plus, Star, Settings, Search, Folder, ChevronDown, ChevronRight, ChevronUp, Trash2, Edit2, Pin, PinOff, FileText, Globe, Code2 } from 'lucide-react';
 
 function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
   const hue = seed.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
@@ -28,19 +28,72 @@ export function Sidebar() {
     setConfirmConfig,
     setIsProfilePanelOpen, userProfile,
     setIsSettingsModalOpen,
+    appMode, setAppMode,
   } = useAppStore();
   const { user } = useAuthStore();
 
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-  const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('quietnotes_folder_expansion_preferences');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
+
+  const [isFavoritesExpanded, setIsFavoritesExpanded] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('quietnotes_favorites_expanded_preference');
+        if (saved !== null) return JSON.parse(saved);
+      } catch {}
+    }
+    return true;
+  });
+
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
 
-  const notes = useLiveQuery(async (): Promise<Note[]> => {
-    const all = await db.notes.toArray();
-    return all.sort((a, b) => b.updated_at - a.updated_at);
+  // Persistent note ordering map: { [categoryIdOrUncategorized]: string[] }
+  const [noteOrderMap, setNoteOrderMap] = useState<Record<string, string[]>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('quietnotes_note_order_preferences');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
   });
+
+  const saveNoteOrderMap = (updater: (prev: Record<string, string[]>) => Record<string, string[]>) => {
+    setNoteOrderMap(prev => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem('quietnotes_note_order_preferences', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('quietnotes_folder_expansion_preferences', JSON.stringify(expandedCategories));
+    } catch {}
+  }, [expandedCategories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('quietnotes_favorites_expanded_preference', JSON.stringify(isFavoritesExpanded));
+    } catch {}
+  }, [isFavoritesExpanded]);
+
+  // Read notes WITHOUT sorting by updated_at!
+  // This guarantees editing or auto-save never alters the list position.
+  const notes = useLiveQuery(async (): Promise<Note[]> => {
+    return await db.notes.toArray();
+  });
+
   const categories = useLiveQuery(async (): Promise<Category[]> => {
     const list = await db.categories.toArray();
     return list.sort((a, b) => {
@@ -57,19 +110,53 @@ export function Sidebar() {
   ) || [];
   const favoriteNotes = filteredNotes.filter(n => n.is_featured);
 
-  const groupedNotes = filteredNotes.reduce((acc: Record<string, Note[]>, note: Note) => {
-    const catId = note.category_id || 'uncategorized';
-    if (!acc[catId]) acc[catId] = [];
-    acc[catId].push(note);
-    return acc;
-  }, {} as Record<string, typeof filteredNotes>);
+  // Deterministic, stable ordering for notes in any category
+  const sortNotesForCategory = (catId: string, noteList: Note[]): Note[] => {
+    const orderList = noteOrderMap[catId] || [];
+    return [...noteList].sort((a, b) => {
+      const idxA = orderList.indexOf(a.id);
+      const idxB = orderList.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      // Stable fallback: created_at descending (so new notes appear at top, but typing/updated_at never moves them)
+      return (b.created_at || 0) - (a.created_at || 0);
+    });
+  };
 
-  const toggleCategory = (id: string) => setExpandedCategories(prev => ({ ...prev, [id]: !prev[id] }));
+  const groupedNotes = useMemo(() => {
+    const rawGroups = filteredNotes.reduce((acc: Record<string, Note[]>, note: Note) => {
+      const catId = note.category_id || 'uncategorized';
+      if (!acc[catId]) acc[catId] = [];
+      acc[catId].push(note);
+      return acc;
+    }, {});
 
-  const handleCreateNote = async (category_id?: string) => {
+    const sortedGroups: Record<string, Note[]> = {};
+    for (const [catId, noteList] of Object.entries(rawGroups)) {
+      sortedGroups[catId] = sortNotesForCategory(catId, noteList);
+    }
+    return sortedGroups;
+  }, [filteredNotes, noteOrderMap]);
+
+  const toggleCategory = (id: string) => {
+    setExpandedCategories(prev => {
+      const next = {
+        ...prev,
+        [id]: prev[id] === undefined ? false : !prev[id]
+      };
+      try {
+        localStorage.setItem('quietnotes_folder_expansion_preferences', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleCreateNote = async (categoryId?: string) => {
     if (!user) return;
-    const id = await createNote(user.id, { category_id });
-    setSelectedNoteId(id);
+    setAppMode('notes');
+    const newId = await createNote(user.id, { category_id: categoryId });
+    setSelectedNoteId(newId);
   };
 
   const handleCreateCategory = async () => {
@@ -92,54 +179,25 @@ export function Sidebar() {
     });
   };
 
-
   const handleEditCategory = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setEditingCategoryId(id);
     setIsEditCategoryModalOpen(true);
   };
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    setDraggedCategoryId(id);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleNoteDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('note_id', id);
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    setDraggedCategoryId(null);
+  // Move Folder Up/Down
+  const handleMoveCategory = async (e: React.MouseEvent, categoryId: string, direction: 'up' | 'down') => {
+    e.stopPropagation();
     if (!categories || !user) return;
-
-    // Check if dropping a note
-    const noteId = e.dataTransfer.getData('note_id');
-    if (noteId) {
-      const note = notes?.find(n => n.id === noteId);
-      if (note && note.category_id !== targetId) {
-        await updateNote(noteId, user.id, { category_id: targetId === 'uncategorized' ? undefined : targetId });
-      }
-      return;
-    }
-
-    const sourceId = e.dataTransfer.getData('text/plain');
-    if (!sourceId || sourceId === targetId) return;
-
-    const sourceIndex = categories.findIndex(c => c.id === sourceId);
-    const targetIndex = categories.findIndex(c => c.id === targetId);
-
-    if (sourceIndex === -1 || targetIndex === -1) return;
+    const index = categories.findIndex(c => c.id === categoryId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
 
     const reordered = [...categories];
-    const [dragged] = reordered.splice(sourceIndex, 1);
-    reordered.splice(targetIndex, 0, dragged);
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
 
-    // Save the new sort_orders
     for (let i = 0; i < reordered.length; i++) {
       const cat = reordered[i];
       if (cat.sort_order !== i) {
@@ -148,8 +206,24 @@ export function Sidebar() {
     }
   };
 
-  const handleDragEnd = () => {
-    setDraggedCategoryId(null);
+  // Move Note Up/Down within its folder or list
+  const handleMoveNote = (e: React.MouseEvent, noteId: string, catKey: string, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    const currentList = catKey === 'favorites' ? favoriteNotes : (groupedNotes[catKey] || []);
+    const index = currentList.findIndex(n => n.id === noteId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentList.length) return;
+
+    const reordered = [...currentList];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const newOrderIds = reordered.map(n => n.id);
+    saveNoteOrderMap(prev => ({
+      ...prev,
+      [catKey]: newOrderIds
+    }));
   };
 
   return (
@@ -185,173 +259,305 @@ export function Sidebar() {
           </button>
         </div>
 
-      {/* Search */}
-      <div className="p-4 border-b border-stone-200 bg-white">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-          <input
-            type="text"
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50 border border-stone-200 rounded-lg outline-none focus:border-stone-400 focus:bg-white transition-all placeholder:text-stone-400"
-          />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
-        {/* Favorites Section */}
-        {favoriteNotes.length > 0 && (
-          <div className="mt-4 mb-2">
-            <div
-              className="flex items-center justify-between px-2 py-1.5 cursor-pointer group rounded-md hover:bg-stone-200/50 transition-colors"
-              onClick={() => setIsFavoritesExpanded(!isFavoritesExpanded)}
-            >
-              <div className="flex items-center gap-2 text-stone-600 group-hover:text-stone-900 transition-colors">
-                {isFavoritesExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                <span className="text-sm font-medium">Favorites</span>
-              </div>
-            </div>
-            {isFavoritesExpanded && (
-              <div className="space-y-0.5 ml-3.5 pl-3 border-l border-stone-200/80 mt-1">
-                {favoriteNotes.map(note => (
-                  <button
-                    key={note.id}
-                    draggable
-                    onDragStart={(e) => handleNoteDragStart(e, note.id)}
-                    onClick={() => setSelectedNoteId(note.id)}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-all duration-200 ${selectedNoteId === note.id ? 'bg-stone-200/70 shadow-sm text-stone-900' : 'hover:bg-stone-200/40 text-stone-500 hover:text-stone-800'}`}
-                  >
-                    <span className="text-sm truncate font-medium block">{note.title || 'Untitled Note'}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Folders Header */}
-        <div className="px-2 pt-5 pb-2 flex items-center justify-between">
-          <span className="text-xs font-heading font-semibold tracking-widest text-stone-500 uppercase">Folders</span>
-          <button onClick={() => setIsCreatingCategory(!isCreatingCategory)} className="text-stone-400 hover:text-stone-800 transition-colors">
-            <Plus className="w-3.5 h-3.5" />
+        {/* Workspace Mode Switcher: Notes vs Devtool */}
+        <div className="px-3 py-2 bg-stone-100/70 border-b border-stone-200 flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setAppMode('notes')}
+            title="Notes"
+            className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              appMode === 'notes'
+                ? 'bg-white text-stone-900 shadow-2xs font-semibold'
+                : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Notes</span>
+          </button>
+          <button
+            onClick={() => setAppMode('browser')}
+            title="Devtool"
+            className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              appMode === 'browser'
+                ? 'bg-blue-600 text-white shadow-2xs font-semibold'
+                : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span>Devtool</span>
           </button>
         </div>
 
-        {isCreatingCategory && (
-          <div className="px-2 pb-2">
+        {/* Search */}
+        <div className="p-4 border-b border-stone-200 bg-white">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
-              autoFocus
               type="text"
-              placeholder="Folder name..."
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); if (e.key === 'Escape') setIsCreatingCategory(false); }}
-              className="w-full text-sm px-3 py-1.5 bg-white border border-stone-200 rounded outline-none focus:border-stone-400 shadow-sm"
+              placeholder="Search notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50 border border-stone-200 rounded-lg outline-none focus:border-stone-400 focus:bg-white transition-all placeholder:text-stone-400"
             />
           </div>
-        )}
+        </div>
 
-        {/* Categories & Notes List */}
-        <div className="space-y-4">
-          {[{ id: 'uncategorized', name: 'Uncategorized' }, ...(categories || [])].map(category => {
-            const categoryNotes = groupedNotes[category.id] || [];
-            if (category.id === 'uncategorized' && categoryNotes.length === 0 && categories?.length !== 0) return null;
-            const isExpanded = expandedCategories[category.id] !== false;
-            const isCustom = category.id !== 'uncategorized';
-
-            return (
-              <div key={category.id} className="space-y-1">
-                <div
-                  draggable={isCustom}
-                  onDragStart={(e) => isCustom && handleDragStart(e, category.id)}
-                  onDragOver={(e) => {
-                    // Allow dropping notes even on Uncategorized
-                    e.preventDefault();
-                  }}
-                  onDrop={(e) => handleDrop(e, category.id)}
-                  onDragEnd={() => isCustom && handleDragEnd()}
-                  className={`flex items-center justify-between px-2 py-1.5 cursor-pointer group rounded-md hover:bg-stone-200/50 transition-all duration-200 ${draggedCategoryId === category.id ? 'opacity-40 scale-[0.98] bg-stone-100' : ''}`}
-                  onClick={() => toggleCategory(category.id)}
-                >
-                  <div className="flex items-center gap-2 text-stone-600 group-hover:text-stone-900 transition-colors flex-1 min-w-0">
-                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />}
-                    <Folder className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="text-sm font-medium truncate">{category.name}</span>
-                  </div>
-                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {isCustom && (
-                      <>
-                        <button onClick={(e) => handleEditCategory(e, category.id)} className="p-1.5 text-stone-400 hover:text-stone-800 transition-colors">
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button onClick={(e) => handleDeleteCategory(e, category.id, category.name)} className="p-1.5 text-stone-400 hover:text-red-500 transition-colors">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleCreateNote(isCustom ? category.id : undefined); }}
-                      className="p-1.5 text-stone-400 hover:text-stone-800 transition-colors ml-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+        <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
+          {/* Favorites Section */}
+          {favoriteNotes.length > 0 && (
+            <div className="mt-4 mb-2">
+              <div
+                className="flex items-center justify-between px-2 py-1.5 cursor-pointer group rounded-md hover:bg-stone-200/50 transition-colors"
+                onClick={() => setIsFavoritesExpanded(!isFavoritesExpanded)}
+              >
+                <div className="flex items-center gap-2 text-stone-600 group-hover:text-stone-900 transition-colors">
+                  {isFavoritesExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                  <span className="text-sm font-medium">Favorites</span>
                 </div>
-
-                {isExpanded && (
-                  <div className="space-y-0.5 ml-3.5 pl-3 border-l border-stone-200/80">
-                    {categoryNotes.map(note => (
-                      <button
-                        key={note.id}
-                        draggable
-                        onDragStart={(e) => handleNoteDragStart(e, note.id)}
-                        onClick={() => setSelectedNoteId(note.id)}
-                        className={`w-full text-left px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2 ${selectedNoteId === note.id ? 'bg-stone-200/70 shadow-sm text-stone-900' : 'hover:bg-stone-200/40 text-stone-500 hover:text-stone-800'}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm truncate font-medium">{note.title || 'Untitled Note'}</span>
-                          {note.is_featured && <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0 ml-2" />}
-                        </div>
-                      </button>
-                    ))}
-                    {categoryNotes.length === 0 && (
-                      <div className="px-3 py-2 text-xs text-stone-400 italic">Empty folder</div>
-                    )}
-                  </div>
-                )}
               </div>
-            );
-          })}
-        </div>
-      </div>
+              {isFavoritesExpanded && (
+                <div className="space-y-0.5 ml-3.5 pl-3 border-l border-stone-200/80 mt-1">
+                  {favoriteNotes.map((note, favIndex) => {
+                    const isSelected = selectedNoteId === note.id;
+                    const canMoveUp = favIndex > 0;
+                    const canMoveDown = favIndex < favoriteNotes.length - 1;
 
-
-
-      {/* Profile Footer */}
-      <div className="border-t border-stone-200 bg-stone-100/50 p-3">
-        <div className="flex items-center w-full group">
-          <button
-            onClick={() => setIsProfilePanelOpen(true)}
-            className="flex-1 flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-stone-200/60 transition-colors"
-          >
-            <Avatar seed={userProfile?.avatar_seed || userProfile?.username || 'QN'} size={32} />
-            <div className="text-left min-w-0">
-              <p className="text-sm font-medium text-stone-800 truncate">{userProfile?.display_name || '...'}</p>
-              <p className="text-xs text-stone-400 truncate">@{userProfile?.username || '...'}</p>
+                    return (
+                      <div
+                        key={note.id}
+                        onClick={() => {
+                          setAppMode('notes');
+                          setSelectedNoteId(note.id);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-150 flex items-center justify-between gap-1 group/note cursor-pointer ${
+                          isSelected
+                            ? 'bg-stone-200/70 shadow-xs text-stone-900 font-medium'
+                            : 'hover:bg-stone-200/40 text-stone-600 hover:text-stone-900'
+                        }`}
+                      >
+                        <span className="text-sm truncate flex-1 min-w-0 font-medium">{note.title || 'Untitled Note'}</span>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0 mr-1" />
+                          <div className="flex items-center opacity-0 group-hover/note:opacity-100 focus-within:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={(e) => handleMoveNote(e, note.id, 'favorites', 'up')}
+                              disabled={!canMoveUp}
+                              title="Move up"
+                              aria-label="Move up"
+                              className="p-1 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-300/60 disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleMoveNote(e, note.id, 'favorites', 'down')}
+                              disabled={!canMoveDown}
+                              title="Move down"
+                              aria-label="Move down"
+                              className="p-1 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-300/60 disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </button>
-          <button 
-            onClick={() => setIsSettingsModalOpen(true)}
-            className="p-2 ml-1 text-stone-400 hover:text-stone-800 hover:bg-stone-200/60 rounded-lg transition-colors"
-            title="Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          )}
+
+          {/* Folders Header */}
+          <div className="px-2 pt-5 pb-2 flex items-center justify-between">
+            <span className="text-xs font-heading font-semibold tracking-widest text-stone-500 uppercase">Folders</span>
+            <button onClick={() => setIsCreatingCategory(!isCreatingCategory)} className="text-stone-400 hover:text-stone-800 transition-colors" title="Create new folder" aria-label="Create new folder">
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {isCreatingCategory && (
+            <div className="px-2 pb-2">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Folder name..."
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); if (e.key === 'Escape') setIsCreatingCategory(false); }}
+                className="w-full text-sm px-3 py-1.5 bg-white border border-stone-200 rounded outline-none focus:border-stone-400 shadow-sm"
+              />
+            </div>
+          )}
+
+          {/* Categories & Notes List */}
+          <div className="space-y-4">
+            {[{ id: 'uncategorized', name: 'Uncategorized' }, ...(categories || [])].map(category => {
+              const categoryNotes = groupedNotes[category.id] || [];
+              const isCustom = category.id !== 'uncategorized';
+              const isExpanded = expandedCategories[category.id] !== false;
+
+              // Index among custom categories for boundary check
+              const catIndex = (categories || []).findIndex(c => c.id === category.id);
+              const totalCustomCats = (categories || []).length;
+              const canCatMoveUp = isCustom && catIndex > 0;
+              const canCatMoveDown = isCustom && catIndex !== -1 && catIndex < totalCustomCats - 1;
+
+              return (
+                <div key={category.id} className="space-y-1 relative">
+                  <div
+                    className="flex items-center justify-between px-2 py-1.5 cursor-pointer group rounded-md hover:bg-stone-200/50 transition-all duration-150"
+                    onClick={() => toggleCategory(category.id)}
+                  >
+                    <div className="flex items-center gap-2 text-stone-600 group-hover:text-stone-900 transition-colors flex-1 min-w-0">
+                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />}
+                      <Folder className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="text-sm font-medium truncate">{category.name}</span>
+                      <span className="text-xs text-stone-400 font-normal">({categoryNotes.length})</span>
+                    </div>
+                    <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity gap-0.5">
+                      {isCustom && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => handleMoveCategory(e, category.id, 'up')}
+                            disabled={!canCatMoveUp}
+                            title="Move folder up"
+                            aria-label="Move folder up"
+                            className="p-1 text-stone-400 hover:text-stone-800 hover:bg-stone-200/80 rounded transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleMoveCategory(e, category.id, 'down')}
+                            disabled={!canCatMoveDown}
+                            title="Move folder down"
+                            aria-label="Move folder down"
+                            className="p-1 text-stone-400 hover:text-stone-800 hover:bg-stone-200/80 rounded transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleEditCategory(e, category.id)}
+                            title="Rename folder"
+                            aria-label="Rename folder"
+                            className="p-1 text-stone-400 hover:text-stone-800 hover:bg-stone-200/80 rounded transition-colors"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteCategory(e, category.id, category.name)}
+                            title="Delete folder"
+                            aria-label="Delete folder"
+                            className="p-1 text-stone-400 hover:text-red-500 hover:bg-stone-200/80 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleCreateNote(isCustom ? category.id : undefined); }}
+                        className="p-1 text-stone-400 hover:text-stone-800 hover:bg-stone-200/80 rounded transition-colors ml-0.5"
+                        title="New note in folder"
+                        aria-label="New note in folder"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="space-y-0.5 ml-3.5 pl-3 border-l border-stone-200/80 min-h-[20px] py-0.5">
+                      {categoryNotes.map((note, noteIndex) => {
+                        const isSelected = selectedNoteId === note.id;
+                        const canMoveUp = noteIndex > 0;
+                        const canMoveDown = noteIndex < categoryNotes.length - 1;
+
+                        return (
+                          <div
+                            key={note.id}
+                            onClick={() => {
+                              setAppMode('notes');
+                              setSelectedNoteId(note.id);
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-150 flex items-center justify-between gap-1 group/note cursor-pointer ${
+                              isSelected 
+                                ? 'bg-stone-200/70 shadow-xs text-stone-900 font-medium' 
+                                : 'hover:bg-stone-200/40 text-stone-600 hover:text-stone-900'
+                            }`}
+                          >
+                            <span className="text-sm truncate flex-1 min-w-0">{note.title || 'Untitled Note'}</span>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {note.is_featured && <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0 mr-1" />}
+                              <div className="flex items-center opacity-0 group-hover/note:opacity-100 focus-within:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleMoveNote(e, note.id, category.id, 'up')}
+                                  disabled={!canMoveUp}
+                                  title="Move up"
+                                  aria-label="Move up"
+                                  className="p-1 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-300/60 disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <ChevronUp className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleMoveNote(e, note.id, category.id, 'down')}
+                                  disabled={!canMoveDown}
+                                  title="Move down"
+                                  aria-label="Move down"
+                                  className="p-1 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-300/60 disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <ChevronDown className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {categoryNotes.length === 0 && (
+                        <div className="px-3 py-1.5 text-xs text-stone-400 italic">
+                          Empty folder
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    </aside>
+
+        {/* Profile Footer */}
+        <div className="border-t border-stone-200 bg-stone-100/50 p-3">
+          <div className="flex items-center w-full group">
+            <button
+              onClick={() => setIsProfilePanelOpen(true)}
+              className="flex-1 flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-stone-200/60 transition-colors"
+            >
+              <Avatar seed={userProfile?.avatar_seed || userProfile?.username || 'QN'} size={32} />
+              <div className="text-left min-w-0">
+                <p className="text-sm font-medium text-stone-800 truncate">{userProfile?.display_name || '...'}</p>
+                <p className="text-xs text-stone-400 truncate">@{userProfile?.username || '...'}</p>
+              </div>
+            </button>
+            <button 
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="p-2 ml-1 text-stone-400 hover:text-stone-800 hover:bg-stone-200/60 rounded-lg transition-colors"
+              title="Settings"
+              aria-label="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </aside>
     </>
   );
 }

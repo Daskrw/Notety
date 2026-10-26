@@ -7,6 +7,7 @@
  */
 import { supabase } from './supabase';
 import { db, Note, Category, Snippet, Highlight } from './db';
+import { parseImageTokens, deleteAssetIfOrphaned, syncPendingAssets, prefetchNoteAssets } from './assets';
 
 // Helper for safe background Supabase sync
 async function safeSupabaseSync(fn: () => PromiseLike<any>, label: string) {
@@ -82,6 +83,8 @@ export async function updateNote(id: string, userId: string, changes: Partial<No
 }
 
 export async function deleteNote(id: string, userId: string): Promise<void> {
+  const existingNote = await db.notes.get(id);
+
   // 1. Delete from local Dexie immediately
   await db.highlights.where('note_id').equals(id).delete();
   await db.notes.delete(id);
@@ -89,6 +92,14 @@ export async function deleteNote(id: string, userId: string): Promise<void> {
   // 2. Sync deletion to Supabase in background
   safeSupabaseSync(() => supabase.from('highlights').delete().eq('note_id', id).eq('user_id', userId), 'deleteHighlights');
   safeSupabaseSync(() => supabase.from('notes').delete().eq('id', id).eq('user_id', userId), 'deleteNote');
+
+  // 3. Clean up any orphaned image assets from this note
+  if (existingNote?.content) {
+    const tokens = parseImageTokens(existingNote.content);
+    for (const tok of tokens) {
+      deleteAssetIfOrphaned(tok.assetId, userId).catch(() => {});
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -283,6 +294,10 @@ export async function loadUserData(userId: string): Promise<void> {
         });
       }
     }
+
+    // 5. Sync pending assets & pre-fetch note assets for Device B
+    syncPendingAssets(userId).catch(() => {});
+    prefetchNoteAssets(userId).catch(() => {});
   } catch (err) {
     console.warn('Network offline or error loading remote user data:', err);
   }

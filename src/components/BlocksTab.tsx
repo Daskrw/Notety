@@ -1,5 +1,5 @@
 "use client";
-import { Lock, Activity, Briefcase, Image as ImageIcon, Calendar } from 'lucide-react';
+import { Lock, Activity, Briefcase, Image as ImageIcon, Calendar, FileCode } from 'lucide-react';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 import { useAppStore } from '@/store/useStore';
 import { db } from '@/lib/db';
@@ -241,6 +241,54 @@ function PhotoUploadButton() {
   );
 }
 
+function TestTemBlockDraggable() {
+  const { selectedNoteId } = useAppStore();
+  const payload = { 
+    id: 'template-testtem', 
+    type: 'testtem' as const, 
+    value: { segments: [{ type: 'text' as const, id: crypto.randomUUID(), text: '' }] } 
+  };
+  const { onMouseDown } = useDraggableBlock(payload, '📝 TestTem');
+
+  const handleClick = async () => {
+    if (!selectedNoteId) return;
+    const note = await db.notes.get(selectedNoteId);
+    if (!note) return;
+    const tripParsed = parseTripToGoContent(note.content);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
+    const newBlock = { 
+      id: crypto.randomUUID(), 
+      type: 'testtem' as const, 
+      value: { segments: [{ type: 'text' as const, id: crypto.randomUUID(), text: '' }] } 
+    };
+    const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
+    let finalContent = isOilTravelContent(note.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
+      : baseContent;
+    if (isTripToGoContent(note.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
+
+    await db.notes.update(selectedNoteId, {
+      content: finalContent,
+      updated_at: Date.now()
+    });
+  };
+
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onClick={handleClick}
+      title="Drag or tap to add TestTem to note"
+      className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-stone-200 rounded-md cursor-grab active:cursor-grabbing hover:bg-stone-100 hover:border-stone-300 transition-all shadow-sm select-none shrink-0"
+    >
+      <FileCode size={14} className="text-amber-600" />
+      <span className="text-sm font-medium text-stone-700">TestTem</span>
+    </div>
+  );
+}
+
 export function BlocksTab() {
   return (
     <div className="h-14 border-t border-stone-200 bg-stone-50 flex items-center px-4 sm:px-8 space-x-2 sm:space-x-4 flex-shrink-0 overflow-x-auto custom-scrollbar select-none">
@@ -248,6 +296,7 @@ export function BlocksTab() {
       <PingBlockDraggable />
       <JobBlockDraggable />
       <ScheduleBlockDraggable />
+      <TestTemBlockDraggable />
     </div>
   );
 }

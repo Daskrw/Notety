@@ -5,7 +5,7 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu, FileText, Map, ExternalLink, Globe, Fuel } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu, FileText, Map, Fuel, Globe, Image as ImageIcon, Loader2, Code2 } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
@@ -15,25 +15,209 @@ import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent, Trip
 import { OilTravelView } from './OilTravelView';
 import { isOilTravelContent, parseOilTravelContent, serializeOilTravelContent, OilTravelData } from '@/lib/oiltravel';
 import { registerDropListener, DragBlockPayload } from '@/hooks/useDragBlock';
+import { DocumentImageView } from './DocumentImageView';
+import { BrowserModeView } from './BrowserModeView';
+import { nativeHideAll, loadSavedBrowserState, nativePauseMedia } from '@/lib/browser';
+import { 
+  saveImageAsset, 
+  validateImageFile, 
+  formatImageMarkdown, 
+  splitTextIntoSegments, 
+  reconstructTextFromSegments, 
+  deleteAssetIfOrphaned,
+  ParsedImageToken, 
+  DocumentSegment 
+} from '@/lib/assets';
 
-// Helper to extract URLs from text
-function extractUrls(text: string): string[] {
+// Types for inline link tokenization
+export interface TextToken {
+  type: 'text';
+  value: string;
+  start: number;
+  end: number;
+}
+
+export interface LinkToken {
+  type: 'link';
+  text: string;
+  url: string;
+  raw: string;
+  start: number;
+  end: number;
+}
+
+export type InlineToken = TextToken | LinkToken;
+
+// Helper to separate trailing sentence punctuation from URLs
+function cleanUrlAndTrailingPunctuation(rawUrl: string): { url: string; trailing: string } {
+  const trailingPunctuationRegex = /[.,!?:;)\]}’"'>]+$/;
+  const match = rawUrl.match(trailingPunctuationRegex);
+  if (match) {
+    const trailing = match[0];
+    const url = rawUrl.slice(0, rawUrl.length - trailing.length);
+    return { url, trailing };
+  }
+  return { url: rawUrl, trailing: '' };
+}
+
+// Tokenize text into regular text and inline hyperlinks (markdown [text](url) and bare URLs)
+export function tokenizeInlineLinks(text: string): InlineToken[] {
   if (!text) return [];
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
-  const matches = text.match(urlRegex) || [];
-  return Array.from(new Set(matches.map(u => u.startsWith('http') ? u : `https://${u}`)));
+
+  const regex = /\[([^\]]+)\]\(((?:https?:\/\/|www\.)[^\s\)]+|[^\s\)]+)\)|((?:https?:\/\/|www\.)[^\s<>"'()]+)/gi;
+  const tokens: InlineToken[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push({
+        type: 'text',
+        value: text.slice(lastIndex, match.index),
+        start: lastIndex,
+        end: match.index,
+      });
+    }
+
+    if (match[1] && match[2]) {
+      const linkText = match[1];
+      let url = match[2].trim();
+      if (!/^https?:\/\//i.test(url) && !url.startsWith('/')) {
+        url = 'https://' + url;
+      }
+      tokens.push({
+        type: 'link',
+        text: linkText,
+        url,
+        raw: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+      lastIndex = regex.lastIndex;
+    } else if (match[3]) {
+      const rawUrl = match[3];
+      const { url: cleanedUrl } = cleanUrlAndTrailingPunctuation(rawUrl);
+      
+      let finalUrl = cleanedUrl;
+      if (!/^https?:\/\//i.test(finalUrl)) {
+        finalUrl = 'https://' + finalUrl;
+      }
+
+      tokens.push({
+        type: 'link',
+        text: cleanedUrl,
+        url: finalUrl,
+        raw: cleanedUrl,
+        start: match.index,
+        end: match.index + cleanedUrl.length,
+      });
+
+      lastIndex = match.index + cleanedUrl.length;
+      regex.lastIndex = lastIndex;
+    }
+  }
+
+  if (lastIndex < text.length) {
+    tokens.push({
+      type: 'text',
+      value: text.slice(lastIndex),
+      start: lastIndex,
+      end: text.length,
+    });
+  }
+
+  return tokens;
+}
+
+// Safely open URL in Tauri desktop or web browser via operating system default browser
+export async function openExternalUrl(url: string, e?: React.MouseEvent) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  let cleanUrl = url.trim();
+  if (!/^https?:\/\//i.test(cleanUrl) && !cleanUrl.startsWith('/')) {
+    cleanUrl = 'https://' + cleanUrl;
+  }
+  // Validate protocol to prevent dangerous URI schemes
+  if (!/^https?:\/\//i.test(cleanUrl)) {
+    return;
+  }
+  try {
+    const { isTauri } = await import('@tauri-apps/api/core');
+    if (isTauri()) {
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      // Delegated to operating system default URL handler (Edge, Chrome, etc.)
+      await openUrl(cleanUrl);
+      return;
+    }
+  } catch (err) {
+    console.warn('Tauri openUrl error, falling back to window.open:', err);
+  }
+  window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+}
+
+// Subcomponent for the live formatted text overlay
+function LiveFormattedOverlay({ text, isFirstAndEmpty }: { text: string; isFirstAndEmpty?: boolean }) {
+  const inlineTokens = useMemo(() => tokenizeInlineLinks(text), [text]);
+
+  return (
+    <div 
+      aria-hidden="true" 
+      className="absolute inset-0 w-full h-full text-stone-700 leading-relaxed font-sans text-base font-normal whitespace-pre-wrap break-words pointer-events-none p-0 m-0 border-none outline-none select-none"
+      style={{ 
+        wordBreak: 'break-word', 
+        overflowWrap: 'break-word',
+        letterSpacing: 'normal',
+        boxSizing: 'border-box',
+        fontVariantLigatures: 'none',
+      }}
+    >
+      {inlineTokens.length > 0 ? (
+        inlineTokens.map((token, idx) => {
+          if (token.type === 'text') {
+            return <span key={idx}>{token.value}</span>;
+          }
+          return (
+            <a
+              key={idx}
+              href={token.url}
+              onClick={(e) => {
+                openExternalUrl(token.url, e);
+              }}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open ${token.url}`}
+              className="pointer-events-auto text-blue-600 hover:text-blue-800 underline underline-offset-2 font-normal cursor-pointer transition-colors inline"
+            >
+              {token.text}
+            </a>
+          );
+        })
+      ) : isFirstAndEmpty ? (
+        <span className="text-stone-300">Start writing...</span>
+      ) : null}
+      {text.endsWith('\n') ? ' ' : ''}
+    </div>
+  );
 }
 
 export function NoteEditor() {
   const { 
     selectedNoteId, setSelectedNoteId, userProfile, 
     isRightPanelOpen, isRightPanelPinned, toggleRightPanelPin, setRightPanelHovered, toggleRightPanel,
-    isSidebarOpen, isSidebarPinned, toggleSidebarPin, setSidebarHovered, toggleSidebar
+    isSidebarOpen, isSidebarPinned, toggleSidebarPin, setSidebarHovered, toggleSidebar,
+    appMode, setAppMode,
   } = useAppStore();
   const { user } = useAuthStore();
   const [localNote, setLocalNote] = useState<Note | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toolbarFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Track active cursor position for image insertion
+  const activeCursorRef = useRef<{ segmentIndex: number; cursor: number }>({ segmentIndex: 0, cursor: 0 });
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isDragOverEditor, setIsDragOverEditor] = useState(false);
 
   const dbNote = useLiveQuery(
     () => selectedNoteId ? db.notes.get(selectedNoteId) : undefined,
@@ -57,9 +241,7 @@ export function NoteEditor() {
     }
 
     // Same note — check if blocks were modified externally (by RightPanel/BlocksTab)
-    // We need to merge external block changes into localNote to prevent auto-save from overwriting them
     if (localNote && dbNote.content !== localNote.content) {
-      // Parse blocks from both sources
       const dbTripParsed = parseTripToGoContent(dbNote.content);
       const dbOilParsed = parseOilTravelContent(dbTripParsed.text);
       const dbParsed = parseNoteContent(dbOilParsed.text);
@@ -68,12 +250,10 @@ export function NoteEditor() {
       const localOilParsed = parseOilTravelContent(localTripParsed.text);
       const localParsed = parseNoteContent(localOilParsed.text);
 
-      // Check if blocks changed but text didn't (external block mutation)
       const dbBlocksJson = JSON.stringify(dbParsed.blocks);
       const localBlocksJson = JSON.stringify(localParsed.blocks);
       
       if (dbBlocksJson !== localBlocksJson) {
-        // Merge: keep local text, take db blocks
         const mergedBase = serializeNoteContent(localParsed.text, dbParsed.blocks);
         let mergedContent = isOilTravelContent(localNote.content)
           ? serializeOilTravelContent(mergedBase, localOilParsed.data)
@@ -85,7 +265,6 @@ export function NoteEditor() {
       }
     }
   }, [selectedNoteId, dbNote]);
-
 
   useAutoSave(localNote, 400); // Responsive debounce save (400ms)
 
@@ -104,7 +283,7 @@ export function NoteEditor() {
       const oilParsed = parseOilTravelContent(tripParsed.text);
       const parsed = parseNoteContent(oilParsed.text);
 
-      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule'].includes(payload.id);
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem'].includes(payload.id);
       if (!isTemplate && parsed.blocks.some(b => b.id === payload.id)) {
         return;
       }
@@ -200,87 +379,10 @@ export function NoteEditor() {
     });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === (userProfile?.shortcut_trigger_key || ' ') || e.key === 'Tab') {
-      const textarea = e.currentTarget;
-      const text = textarea.value;
-      const cursor = textarea.selectionStart;
-      const prefix = userProfile?.shortcut_prefix || '::';
-
-      const match = text.slice(0, cursor).match(new RegExp(`${prefix}(\\w+)$`));
-
-      if (match) {
-        const keyword = match[1];
-        const snippet = snippets?.find(s => s.shortcut === keyword);
-
-        if (snippet) {
-          e.preventDefault();
-          const start = cursor - match[0].length;
-          const newText = text.slice(0, start) + snippet.content + text.slice(cursor);
-          const tripParsed = parseTripToGoContent(localNote?.content || '');
-          const oilParsed = parseOilTravelContent(tripParsed.text);
-          const parsed = parseNoteContent(oilParsed.text);
-          const baseContent = serializeNoteContent(newText, parsed.blocks);
-          let finalContent = isOilTravelContent(localNote?.content || '')
-            ? serializeOilTravelContent(baseContent, oilParsed.data)
-            : baseContent;
-          if (isTripToGoContent(localNote?.content || '')) {
-            finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
-          }
-          setLocalNote({ ...localNote!, content: finalContent });
-          setTimeout(() => {
-            textarea.selectionStart = textarea.selectionEnd = start + snippet.content.length;
-          }, 0);
-        }
-      }
-    }
-  };
-
-  const handlePasteImage = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (!items || !localNote) return;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.type.indexOf('image') !== -1) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const dataUrl = ev.target?.result as string;
-            if (dataUrl) {
-              const tripParsed = parseTripToGoContent(localNote.content);
-              const oilParsed = parseOilTravelContent(tripParsed.text);
-              const content = parseNoteContent(oilParsed.text);
-              const newImage: ImageBlock = {
-                id: crypto.randomUUID(),
-                type: 'image',
-                url: dataUrl,
-                caption: ''
-              };
-              const baseContent = serializeNoteContent(content.text, [...content.blocks, newImage]);
-              let finalContent = isOilTravelContent(localNote.content)
-                ? serializeOilTravelContent(baseContent, oilParsed.data)
-                : baseContent;
-              if (isTripToGoContent(localNote.content)) {
-                finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
-              }
-              setLocalNote({
-                ...localNote,
-                content: finalContent
-              });
-            }
-          };
-          reader.readAsDataURL(file);
-        }
-      }
-    }
-  };
-
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target !== textareaRef.current && (e.target as HTMLElement).tagName !== 'INPUT') {
-      textareaRef.current?.focus();
+    if ((e.target as HTMLElement).tagName !== 'TEXTAREA' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'BUTTON') {
+      const firstTextarea = editorRef.current?.querySelector('textarea');
+      firstTextarea?.focus();
     }
   };
 
@@ -292,39 +394,44 @@ export function NoteEditor() {
     }
   }, [selectedNoteId, allNotes, setSelectedNoteId]);
 
-  const [viewMode, setViewMode] = useState<'standard' | 'triptogo' | 'oiltravel'>('standard');
+  const [viewMode, setViewMode] = useState<'standard' | 'triptogo' | 'oiltravel' | 'browser'>('standard');
 
   // When switching notes, always open in standard Notes mode by default
   useEffect(() => {
     setViewMode('standard');
   }, [localNote?.id]);
 
+
+
+  // Sync viewMode when appMode is switched back to notes
+  useEffect(() => {
+    if (appMode === 'notes' && viewMode === 'browser') {
+      setViewMode('standard');
+      try {
+        const saved = loadSavedBrowserState();
+        nativeHideAll(saved.tabs.map(t => t.id));
+      } catch {}
+    }
+  }, [appMode, viewMode]);
+
   const tripParsed = parseTripToGoContent(localNote?.content || '');
   const oilParsed = parseOilTravelContent(tripParsed.text);
   const noteContent = parseNoteContent(oilParsed.text);
-  const detectedLinks = useMemo(() => extractUrls(noteContent.text), [noteContent.text]);
 
-  if (!selectedNoteId || !localNote) {
-    return (
-      <div className="flex-1 flex flex-col h-screen bg-white">
-        <div className="h-16 flex items-center justify-between px-4 border-b border-stone-100 flex-shrink-0">
-          <button onClick={toggleSidebarPin} className="p-2 text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium">
-            <Menu className="w-4 h-4" />
-            <span>Open Notes</span>
-          </button>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-stone-400 gap-3">
-          <p className="text-sm font-medium tracking-wide">Select a note to start writing</p>
-        </div>
-      </div>
-    );
-  }
+  // Split document into alternating text and document-style image segments
+  const documentSegments = useMemo(() => splitTextIntoSegments(noteContent.text), [noteContent.text]);
 
-  const isTripMode = viewMode === 'triptogo';
-  const isOilMode = viewMode === 'oiltravel';
-
-  const handleToggleMode = async (mode: 'standard' | 'triptogo' | 'oiltravel') => {
+  const handleToggleMode = async (mode: 'standard' | 'triptogo' | 'oiltravel' | 'browser') => {
+    if (mode === 'browser') {
+      setAppMode('browser');
+    } else {
+      setAppMode('notes');
+    }
     setViewMode(mode);
+    if (mode !== 'browser') {
+      const saved = loadSavedBrowserState();
+      nativeHideAll(saved.tabs.map(t => t.id));
+    }
     if (!localNote) return;
     
     if (mode === 'triptogo' && !isTripToGoContent(localNote.content)) {
@@ -359,6 +466,207 @@ export function NoteEditor() {
     }
       
     setLocalNote({ ...localNote, content: serialized });
+  };
+
+  // Updates text within a specific document segment
+  const handleSegmentTextChange = (segIdx: number, newSegmentText: string) => {
+    const nextSegments = [...documentSegments];
+    if (nextSegments[segIdx]?.type === 'text') {
+      nextSegments[segIdx] = { ...nextSegments[segIdx], text: newSegmentText };
+      const reconstructed = reconstructTextFromSegments(nextSegments);
+      handleNoteTextChange(reconstructed);
+    }
+  };
+
+  // Updates an image token (width, align, caption) within a document segment
+  const handleUpdateImageSegment = (segIdx: number, updated: Partial<ParsedImageToken>) => {
+    const nextSegments = [...documentSegments];
+    const target = nextSegments[segIdx];
+    if (target?.type === 'image') {
+      nextSegments[segIdx] = {
+        ...target,
+        token: { ...target.token, ...updated }
+      };
+      const reconstructed = reconstructTextFromSegments(nextSegments);
+      handleNoteTextChange(reconstructed);
+    }
+  };
+
+  // Deletes an image segment, preserving all surrounding text
+  const handleDeleteImageSegment = (segIdx: number) => {
+    const target = documentSegments[segIdx];
+    const assetId = target?.type === 'image' ? target.token.assetId : undefined;
+    const nextSegments = [...documentSegments];
+    nextSegments.splice(segIdx, 1);
+    const reconstructed = reconstructTextFromSegments(nextSegments);
+    handleNoteTextChange(reconstructed);
+    if (assetId) {
+      deleteAssetIfOrphaned(assetId, user?.id).catch((err) => console.warn('Clean asset error:', err));
+    }
+  };
+
+  // Replaces an image file in-place within a document segment
+  const handleReplaceImageSegment = async (segIdx: number, file: File) => {
+    setIsUploadingImage(true);
+    try {
+      const oldTarget = documentSegments[segIdx];
+      const oldAssetId = oldTarget?.type === 'image' ? oldTarget.token.assetId : undefined;
+      const newAssetId = await saveImageAsset(file, user?.id);
+      const nextSegments = [...documentSegments];
+      const target = nextSegments[segIdx];
+      if (target?.type === 'image') {
+        nextSegments[segIdx] = {
+          ...target,
+          token: { ...target.token, assetId: newAssetId }
+        };
+        const reconstructed = reconstructTextFromSegments(nextSegments);
+        handleNoteTextChange(reconstructed);
+        if (oldAssetId && oldAssetId !== newAssetId) {
+          deleteAssetIfOrphaned(oldAssetId, user?.id).catch((err) => console.warn('Clean asset error:', err));
+        }
+      }
+    } catch (err: any) {
+      alert(err?.message || 'ไม่สามารถเปลี่ยนรูปภาพได้');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Core handler: inserts an image file at the exact cursor position or target segment
+  const handleInsertImageFile = async (
+    file: File | Blob, 
+    cursorTarget?: { segmentIndex: number; cursor: number }
+  ) => {
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      alert(validation.error);
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const assetId = await saveImageAsset(file, user?.id);
+      const imgMarkdown = `\n\n${formatImageMarkdown(assetId, '', 540, 'center')}\n\n`;
+
+      const currentSegments = splitTextIntoSegments(noteContent.text);
+      const targetIdx = cursorTarget?.segmentIndex ?? Math.max(0, currentSegments.length - 1);
+      const targetSeg = currentSegments[targetIdx];
+
+      if (targetSeg && targetSeg.type === 'text') {
+        const cursor = Math.max(0, Math.min(targetSeg.text.length, cursorTarget?.cursor ?? targetSeg.text.length));
+        const before = targetSeg.text.slice(0, cursor);
+        const after = targetSeg.text.slice(cursor);
+        targetSeg.text = before + imgMarkdown + after;
+      } else {
+        // Fallback: append image to the document
+        const lastSeg = currentSegments[currentSegments.length - 1];
+        if (lastSeg && lastSeg.type === 'text') {
+          lastSeg.text += imgMarkdown;
+        } else {
+          currentSegments.push({
+            type: 'text',
+            text: imgMarkdown,
+            id: `seg-append-${Date.now()}`
+          });
+        }
+      }
+
+      const reconstructed = reconstructTextFromSegments(currentSegments);
+      handleNoteTextChange(reconstructed);
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการแทรกรูปภาพ');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Toolbar button triggers file picker
+  const handleToolbarInsertImage = () => {
+    toolbarFileInputRef.current?.click();
+  };
+
+  const handleToolbarFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await handleInsertImageFile(file, activeCursorRef.current);
+      // Reset input value so the same file can be chosen again if needed
+      e.target.value = '';
+    }
+  };
+
+  // Clipboard paste: handles pasting screenshot or copied image file directly into note at cursor
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>, segIdx: number) => {
+    const items = e.clipboardData?.items;
+    if (!items || !localNote) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          const cursor = e.currentTarget.selectionStart;
+          await handleInsertImageFile(file, { segmentIndex: segIdx, cursor });
+          return;
+        }
+      }
+    }
+  };
+
+  // Drag and Drop: handles dropping image files from Windows File Explorer onto the editor
+  const handleEditorDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    setIsDragOverEditor(false);
+
+    // If dragging blocks internally, let registerDropListener handle it
+    if (e.dataTransfer.types.includes('application/x-quietnotes-block')) {
+      return;
+    }
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+          e.preventDefault();
+          e.stopPropagation();
+          await handleInsertImageFile(file, activeCursorRef.current);
+          break;
+        }
+      }
+    }
+  };
+
+  const handleEditorDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setIsDragOverEditor(true);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, segIdx: number) => {
+    if (e.key === (userProfile?.shortcut_trigger_key || ' ') || e.key === 'Tab') {
+      const textarea = e.currentTarget;
+      const text = textarea.value;
+      const cursor = textarea.selectionStart;
+      const prefix = userProfile?.shortcut_prefix || '::';
+
+      const match = text.slice(0, cursor).match(new RegExp(`${prefix}(\\w+)$`));
+
+      if (match) {
+        const keyword = match[1];
+        const snippet = snippets?.find(s => s.shortcut === keyword);
+
+        if (snippet) {
+          e.preventDefault();
+          const start = cursor - match[0].length;
+          const newText = text.slice(0, start) + snippet.content + text.slice(cursor);
+          handleSegmentTextChange(segIdx, newText);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + snippet.content.length;
+          }, 0);
+        }
+      }
+    }
   };
 
   const handleTripDataChange = (newData: TripToGoData) => {
@@ -405,9 +713,93 @@ export function NoteEditor() {
     if (!isRightPanelPinned) setRightPanelHovered(false);
   };
 
+  const isTripMode = viewMode === 'triptogo';
+  const isOilMode = viewMode === 'oiltravel';
+  const isDevtoolActive = appMode === 'browser' || viewMode === 'browser';
+
   return (
-    <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
-      {/* Top Toolbar - Fully Responsive */}
+    <>
+      {/* Devtool View - Kept permanently mounted to preserve tabs, alive WebView instances, and playback position */}
+      <div className={isDevtoolActive ? "relative flex-1 flex flex-col h-screen overflow-hidden bg-white" : "hidden"}>
+        <div className="min-h-14 sm:h-16 py-2 px-3 sm:px-6 lg:px-8 flex items-center justify-between border-b border-stone-100 flex-shrink-0 bg-white/95 backdrop-blur-xs z-10 gap-1.5 sm:gap-3 flex-wrap">
+          <div className="flex items-center space-x-1.5 sm:space-x-2.5 min-w-0 flex-1 flex-wrap py-0.5">
+            {!isSidebarPinned && (
+              <button onClick={toggleSidebarPin} title="Toggle notes sidebar" className="p-1.5 sm:p-2 text-stone-500 hover:text-stone-900 bg-stone-100/80 hover:bg-stone-200/80 border border-stone-200/60 rounded-lg transition-all shrink-0 shadow-2xs active:scale-95 cursor-pointer">
+                <Menu className="w-4 h-4" />
+              </button>
+            )}
+            <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200/60 shrink-0">
+              <button
+                onClick={() => handleToggleMode('standard')}
+                title="Standard Note Mode"
+                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
+              >
+                <FileText size={12} />
+                <span className="inline">Note</span>
+              </button>
+              <button
+                onClick={() => handleToggleMode('triptogo')}
+                title="TripToGo Flowchart Mode"
+                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
+              >
+                <Map size={12} />
+                <span className="inline">TripToGo</span>
+              </button>
+              <button
+                onClick={() => handleToggleMode('oiltravel')}
+                title="Oil Travel Mode"
+                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
+              >
+                <Fuel size={12} />
+                <span className="inline">Oil Travel</span>
+              </button>
+              <button
+                onClick={() => handleToggleMode('browser')}
+                title="Multi-Tab Devtool Mode"
+                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all bg-blue-600 text-white shadow-2xs font-semibold"
+              >
+                <Code2 size={12} />
+                <span className="inline">Devtool</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <BrowserModeView isActive={isDevtoolActive} />
+      </div>
+
+      {/* Notes View - Shown when not in Devtool */}
+      <div className={!isDevtoolActive ? "relative flex-1 flex flex-col h-screen overflow-hidden bg-white" : "hidden"}>
+        {!selectedNoteId || !localNote ? (
+          <div className="flex-1 flex flex-col h-screen bg-white">
+            <div className="h-16 flex items-center justify-between px-4 border-b border-stone-100 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <button onClick={toggleSidebarPin} className="p-2 text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium">
+                  <Menu className="w-4 h-4" />
+                  <span>Open Notes</span>
+                </button>
+              </div>
+              <button 
+                onClick={() => handleToggleMode('browser')} 
+                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors shadow-2xs"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Open Devtool Mode</span>
+              </button>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-stone-400 gap-3">
+              <p className="text-sm font-medium tracking-wide">Select a note to start writing</p>
+              <button 
+                onClick={() => handleToggleMode('browser')}
+                className="mt-2 px-4 py-2 bg-stone-50 hover:bg-stone-100 text-stone-600 border border-stone-200 rounded-xl text-xs font-medium flex items-center gap-2 transition-all hover:shadow-xs"
+              >
+                <Code2 className="w-4 h-4 text-blue-500" />
+                <span>Launch Devtool</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-white">
+            {/* Top Toolbar - Fully Responsive */}
       <div className="min-h-14 sm:h-16 py-2 px-3 sm:px-6 lg:px-8 flex items-center justify-between border-b border-stone-100 flex-shrink-0 bg-white/95 backdrop-blur-xs z-10 gap-1.5 sm:gap-3 flex-wrap">
         <div className="flex items-center space-x-1.5 sm:space-x-2.5 min-w-0 flex-1 flex-wrap py-0.5">
           {!isSidebarPinned && (
@@ -472,7 +864,42 @@ export function NoteEditor() {
               <Fuel size={12} />
               <span className="inline">Oil Travel</span>
             </button>
+            <button
+              onClick={() => handleToggleMode('browser')}
+              title="Multi-Tab Devtool Mode"
+              className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
+            >
+              <Code2 size={12} />
+              <span className="inline">Devtool</span>
+            </button>
           </div>
+
+          {/* Document Image Insertion Toolbar Button */}
+          {viewMode === 'standard' && (
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={handleToolbarInsertImage}
+                disabled={isUploadingImage}
+                title="Insert image at cursor position (แทรกรูปภาพที่ตำแหน่งเคอร์เซอร์)"
+                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-lg border border-stone-200/80 bg-stone-50 hover:bg-stone-100 hover:text-stone-900 text-stone-700 transition-all flex items-center gap-1.5 shrink-0 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {isUploadingImage ? (
+                  <Loader2 size={13} className="animate-spin text-blue-600" />
+                ) : (
+                  <ImageIcon size={13} className="text-stone-600" />
+                )}
+                <span className="hidden sm:inline">{isUploadingImage ? 'Inserting...' : 'Image'}</span>
+              </button>
+              <input
+                ref={toolbarFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleToolbarFileSelected}
+                className="hidden"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 sm:space-x-2 text-stone-400 shrink-0">
@@ -541,7 +968,12 @@ export function NoteEditor() {
         <div 
           key={selectedNoteId}
           ref={editorRef}
-          className="flex-1 overflow-y-auto w-full custom-scrollbar cursor-text"
+          onDrop={handleEditorDrop}
+          onDragOver={handleEditorDragOver}
+          onDragLeave={() => setIsDragOverEditor(false)}
+          className={`flex-1 overflow-y-auto w-full custom-scrollbar cursor-text transition-all ${
+            isDragOverEditor ? 'bg-blue-50/30 ring-2 ring-blue-400 ring-inset' : ''
+          }`}
           onClick={handleContainerClick}
         >
           <div className="w-full max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 py-6 sm:py-10 flex flex-col gap-4">
@@ -553,57 +985,58 @@ export function NoteEditor() {
               className="w-full text-2xl sm:text-3xl md:text-4xl font-heading font-semibold text-stone-800 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 sm:mb-6 cursor-text"
             />
 
-            {/* Clickable Links Bar (If enabled in settings) */}
-            {(userProfile?.enable_clickable_links ?? true) && detectedLinks.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap p-2.5 bg-stone-50 border border-stone-200/80 rounded-xl mb-2">
-                <div className="flex items-center gap-1 text-[11px] font-semibold text-stone-500 uppercase tracking-wider shrink-0 mr-1">
-                  <Globe size={13} className="text-stone-400" />
-                  <span>Links:</span>
-                </div>
-                {detectedLinks.map((url, idx) => {
-                  let display = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-                  if (display.length > 35) display = display.substring(0, 32) + '...';
-                  
-                  const handleOpenLink = async (e: React.MouseEvent) => {
-                    e.preventDefault();
-                    try {
-                      const { openUrl } = await import('@tauri-apps/plugin-opener');
-                      await openUrl(url);
-                    } catch {
-                      window.open(url, '_blank', 'noopener,noreferrer');
-                    }
-                  };
-
-                  return (
-                    <a
-                      key={idx}
-                      href={url}
-                      onClick={handleOpenLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Open ${url}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-stone-100 border border-stone-200 hover:border-stone-400 text-stone-800 text-xs font-medium rounded-lg transition-all shadow-2xs hover:shadow-xs group/link cursor-pointer"
-                    >
-                      <span className="truncate">{display}</span>
-                      <ExternalLink size={11} className="text-stone-400 group-hover/link:text-stone-700 shrink-0" />
-                    </a>
-                  );
-                })}
-              </div>
-            )}
-
             <div className="flex-1 min-h-[500px] flex flex-col pb-32">
-              <TextareaAutosize
-                ref={textareaRef}
-                value={noteContent.text}
-                onChange={(e) => handleNoteTextChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePasteImage}
-                placeholder="Start writing..."
-                className="w-full min-h-[300px] resize-none overflow-hidden bg-transparent border-none outline-none text-stone-700 leading-relaxed font-sans"
-                minRows={10}
-              />
+              {/* Document Flow: Render Text & In-Place Document Images */}
+              {documentSegments.map((segment, segIdx) => {
+                if (segment.type === 'text') {
+                  const isFirstAndEmpty = segIdx === 0 && documentSegments.length === 1 && !segment.text;
+                  return (
+                    <div key={segment.id} className="relative w-full min-h-[40px] my-1">
+                      {/* Layer 1: Native Textarea (receives all normal typing and clicks) */}
+                      <TextareaAutosize
+                        value={segment.text}
+                        onChange={(e) => handleSegmentTextChange(segIdx, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, segIdx)}
+                        onPaste={(e) => handlePaste(e, segIdx)}
+                        onSelect={(e) => {
+                          activeCursorRef.current = { segmentIndex: segIdx, cursor: e.currentTarget.selectionStart };
+                        }}
+                        onClick={(e) => {
+                          activeCursorRef.current = { segmentIndex: segIdx, cursor: e.currentTarget.selectionStart };
+                        }}
+                        className="w-full resize-none overflow-hidden bg-transparent border-none outline-none text-transparent caret-stone-800 leading-relaxed font-sans text-base font-normal whitespace-pre-wrap break-words p-0 m-0 selection:bg-blue-200/40 selection:text-transparent"
+                        style={{ 
+                          wordBreak: 'break-word', 
+                          overflowWrap: 'break-word',
+                          letterSpacing: 'normal',
+                          boxSizing: 'border-box',
+                          fontVariantLigatures: 'none',
+                        }}
+                        minRows={segIdx === 0 && documentSegments.length === 1 ? 10 : 2}
+                      />
 
+                      {/* Layer 2: Live Synchronized Formatted Overlay */}
+                      <LiveFormattedOverlay 
+                        text={segment.text} 
+                        isFirstAndEmpty={isFirstAndEmpty} 
+                      />
+                    </div>
+                  );
+                } else {
+                  return (
+                    <DocumentImageView
+                      key={segment.id}
+                      token={segment.token}
+                      userId={user?.id}
+                      onUpdate={(updated) => handleUpdateImageSegment(segIdx, updated)}
+                      onDelete={() => handleDeleteImageSegment(segIdx)}
+                      onReplace={(file) => handleReplaceImageSegment(segIdx, file)}
+                    />
+                  );
+                }
+              })}
+
+              {/* Legacy blocks image support */}
               {noteContent.blocks.filter(b => b.type === 'image').map((block) => {
                 const imgBlock = block as ImageBlock;
                 return (
@@ -621,6 +1054,9 @@ export function NoteEditor() {
       )}
       
       {!isTripMode && <BlocksTab />}
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

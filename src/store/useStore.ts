@@ -65,6 +65,10 @@ interface AppState {
   confirmConfig: ConfirmConfig;
   setConfirmConfig: (config: Partial<ConfirmConfig>) => void;
 
+  // App Mode
+  appMode: 'notes' | 'browser';
+  setAppMode: (mode: 'notes' | 'browser') => void;
+
   // Profile
   isProfilePanelOpen: boolean;
   setIsProfilePanelOpen: (isOpen: boolean) => void;
@@ -134,6 +138,10 @@ export const useAppStore = create<AppState>((set) => ({
   // Confirm Modal
   confirmConfig: { isOpen: false, title: '', message: '', onConfirm: () => {} },
   setConfirmConfig: (config) => set((state) => ({ confirmConfig: { ...state.confirmConfig, ...config } })),
+
+  // App Mode
+  appMode: 'notes',
+  setAppMode: (mode) => set({ appMode: mode }),
 
   // Profile
   isProfilePanelOpen: false,
