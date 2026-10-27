@@ -1,9 +1,9 @@
 "use client";
-import { Lock, Activity, Briefcase, Image as ImageIcon, Calendar, FileCode } from 'lucide-react';
+import { Lock, Activity, Briefcase, Image as ImageIcon, Calendar, FileCode, BookOpen } from 'lucide-react';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 import { useAppStore } from '@/store/useStore';
 import { db } from '@/lib/db';
-import { parseNoteContent, serializeNoteContent, ImageBlock } from '@/lib/blocks';
+import { parseNoteContent, serializeNoteContent, ImageBlock, NameLibraryBlock } from '@/lib/blocks';
 import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent } from '@/lib/triptogo';
 import { isOilTravelContent, parseOilTravelContent, serializeOilTravelContent } from '@/lib/oiltravel';
 
@@ -291,6 +291,54 @@ function TextTemBlockDraggable() {
 
 const TestTemBlockDraggable = TextTemBlockDraggable;
 
+function NameLibraryBlockDraggable() {
+  const { selectedNoteId } = useAppStore();
+  const payload = { 
+    id: 'template-namelibrary', 
+    type: 'namelibrary' as const, 
+    value: { query: '', category: 'all' } 
+  };
+  const { onMouseDown } = useDraggableBlock(payload, '📚 NameLibrary');
+
+  const handleClick = async () => {
+    if (!selectedNoteId) return;
+    const note = await db.notes.get(selectedNoteId);
+    if (!note) return;
+    const tripParsed = parseTripToGoContent(note.content);
+    const oilParsed = parseOilTravelContent(tripParsed.text);
+    const content = parseNoteContent(oilParsed.text);
+    const newBlock: NameLibraryBlock = { 
+      id: crypto.randomUUID(), 
+      type: 'namelibrary', 
+      value: { query: '', category: 'all' } 
+    };
+    const baseContent = serializeNoteContent(content.text, [...content.blocks, newBlock]);
+    let finalContent = isOilTravelContent(note.content)
+      ? serializeOilTravelContent(baseContent, oilParsed.data)
+      : baseContent;
+    if (isTripToGoContent(note.content)) {
+      finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
+    }
+
+    await db.notes.update(selectedNoteId, {
+      content: finalContent,
+      updated_at: Date.now()
+    });
+  };
+
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onClick={handleClick}
+      title="Drag or tap to add NameLibrary to note"
+      className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-stone-200 rounded-md cursor-grab active:cursor-grabbing hover:bg-stone-100 hover:border-stone-300 transition-all shadow-sm select-none shrink-0"
+    >
+      <BookOpen size={14} className="text-teal-600" />
+      <span className="text-sm font-medium text-stone-700">NameLibrary</span>
+    </div>
+  );
+}
+
 export function BlocksTab() {
   return (
     <div className="h-14 border-t border-stone-200 bg-stone-50 flex items-center px-4 sm:px-8 space-x-2 sm:space-x-4 flex-shrink-0 overflow-x-auto custom-scrollbar select-none">
@@ -299,6 +347,7 @@ export function BlocksTab() {
       <JobBlockDraggable />
       <ScheduleBlockDraggable />
       <TextTemBlockDraggable />
+      <NameLibraryBlockDraggable />
     </div>
   );
 }

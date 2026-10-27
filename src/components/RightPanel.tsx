@@ -15,6 +15,7 @@ import { PingBlockView } from './PingBlockView';
 import { JobBlockView } from './JobBlockView';
 import { ScheduleBlockView } from './ScheduleBlockView';
 import { TestTemBlockView } from './TestTemBlockView';
+import { NameLibraryBlockView } from './NameLibraryBlockView';
 
 export function RightPanel() {
   const { 
@@ -54,7 +55,7 @@ export function RightPanel() {
       const tripParsed = parseTripToGoContent(note.content);
       const oilParsed = parseOilTravelContent(tripParsed.text);
       const noteContent = parseNoteContent(oilParsed.text);
-      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem', 'template-texttem'].includes(payload.id);
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem', 'template-texttem', 'template-namelibrary'].includes(payload.id);
 
       // If it's an existing block already in the note, do not duplicate
       if (!isTemplate && noteContent.blocks.some(b => b.id === payload.id)) {
@@ -335,6 +336,8 @@ export function RightPanel() {
                     case 'testtem':
                     case 'texttem':
                       return 'TextTem Template';
+                    case 'namelibrary':
+                      return 'NameLibrary';
                     default: return 'Block';
                   }
                 };
@@ -423,6 +426,13 @@ export function RightPanel() {
                       )}
                       {(block.type === 'testtem' || block.type === 'texttem') && (
                         <TestTemBlockView 
+                          block={block as any}
+                          onChange={(val) => updateBlock(index, val)}
+                          onRemove={() => removeBlock(index)}
+                        />
+                      )}
+                      {block.type === 'namelibrary' && (
+                        <NameLibraryBlockView 
                           block={block as any}
                           onChange={(val) => updateBlock(index, val)}
                           onRemove={() => removeBlock(index)}

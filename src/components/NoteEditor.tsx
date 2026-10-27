@@ -283,7 +283,7 @@ export function NoteEditor() {
       const oilParsed = parseOilTravelContent(tripParsed.text);
       const parsed = parseNoteContent(oilParsed.text);
 
-      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem', 'template-texttem'].includes(payload.id);
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem', 'template-texttem', 'template-namelibrary'].includes(payload.id);
       if (!isTemplate && parsed.blocks.some(b => b.id === payload.id)) {
         return;
       }

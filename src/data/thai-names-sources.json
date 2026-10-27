@@ -1,0 +1,39 @@
+{
+  "title": "Thai Name Library Data Sources and Attributions",
+  "description": "This dataset is compiled from verified open-source and open-government datasets of Thai names.",
+  "sources": [
+    {
+      "id": "corpus",
+      "name": "Thai Male, Female, and Family Name Corpus",
+      "authors": [
+        "Korkeat Wannapat",
+        "Arthit Suriyawongkul"
+      ],
+      "license": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "url": "https://github.com/korkeatw/thai-names-corpus",
+      "counts": {
+        "male": 7124,
+        "female": 5098,
+        "family": 9836
+      }
+    },
+    {
+      "id": "orst",
+      "name": "ชื่อบุคคลพร้อมความหมาย (Person names and meanings)",
+      "agency": "สำนักงานราชบัณฑิตยสภา (Office of the Royal Society, Thailand)",
+      "division": "กองศิลปกรรม (Arts Division)",
+      "license": "Open Data Common",
+      "url": "https://data.go.th/dataset/orst_0301",
+      "counts": {
+        "total": 213,
+        "meanings": 213
+      }
+    }
+  ],
+  "notes": [
+    "Original spellings are strictly preserved from each source.",
+    "Deduplicated without merging distinct spellings.",
+    "No personal records, private information, or sensitive identity data is collected or stored."
+  ]
+}

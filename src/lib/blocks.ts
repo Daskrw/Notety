@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule' | 'testtem' | 'texttem';
+export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule' | 'testtem' | 'texttem' | 'namelibrary';
 
 export interface BaseBlock {
   id: string;
@@ -81,7 +81,17 @@ export interface TextTemBlock extends BaseBlock {
 }
 export type TestTemBlock = TextTemBlock;
 
-export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock | TextTemBlock;
+export interface NameLibraryBlockValue {
+  query?: string;
+  category?: 'all' | 'male' | 'female' | 'surname' | 'first_name' | 'meaning';
+}
+
+export interface NameLibraryBlock extends BaseBlock {
+  type: 'namelibrary';
+  value: NameLibraryBlockValue | string;
+}
+
+export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock | TextTemBlock | NameLibraryBlock;
 
 export interface NoteContent {
   text: string;
