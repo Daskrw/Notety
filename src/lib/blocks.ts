@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule' | 'testtem';
+export type BlockType = 'text' | 'password' | 'ping' | 'job' | 'image' | 'schedule' | 'testtem' | 'texttem';
 
 export interface BaseBlock {
   id: string;
@@ -62,23 +62,26 @@ export interface ScheduleBlock extends BaseBlock {
   value: ScheduleBlockValue | string;
 }
 
-export interface TestTemSegment {
+export interface TextTemSegment {
   type: 'text' | 'field';
   id: string;
   text?: string;
   placeholder?: string;
 }
+export type TestTemSegment = TextTemSegment;
 
-export interface TestTemBlockValue {
-  segments: TestTemSegment[];
+export interface TextTemBlockValue {
+  segments: TextTemSegment[];
 }
+export type TestTemBlockValue = TextTemBlockValue;
 
-export interface TestTemBlock extends BaseBlock {
-  type: 'testtem';
-  value: TestTemBlockValue | string;
+export interface TextTemBlock extends BaseBlock {
+  type: 'testtem' | 'texttem';
+  value: TextTemBlockValue | string;
 }
+export type TestTemBlock = TextTemBlock;
 
-export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock | TestTemBlock;
+export type EditorBlock = TextBlock | PasswordBlock | PingBlock | JobBlock | ImageBlock | ScheduleBlock | TextTemBlock;
 
 export interface NoteContent {
   text: string;
@@ -130,3 +133,10 @@ export function parseBlocks(content: string): EditorBlock[] {
 export function serializeBlocks(blocks: EditorBlock[]): string {
   return JSON.stringify({ text: '', blocks });
 }
+
+export function assembleTextTemText(segments: TextTemSegment[]): string {
+  if (!segments || !Array.isArray(segments)) return '';
+  return segments.map(seg => seg.text ?? '').join('');
+}
+export const assembleTestTemText = assembleTextTemText;
+

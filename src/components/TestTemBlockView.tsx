@@ -1,11 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GripVertical, FileCode, Copy, Check, Plus, X } from 'lucide-react';
-import { TestTemBlock, TestTemBlockValue, TestTemSegment } from '@/lib/blocks';
+import { GripVertical, FileCode, Copy, Check, Plus, X, Eraser } from 'lucide-react';
+import { 
+  TextTemBlock, 
+  TextTemBlockValue, 
+  TextTemSegment, 
+  TestTemBlock, 
+  TestTemBlockValue, 
+  TestTemSegment,
+  assembleTextTemText,
+  assembleTestTemText
+} from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 
+export { assembleTextTemText, assembleTestTemText };
+
 interface Props {
-  block: TestTemBlock;
-  onChange: (val: TestTemBlockValue) => void;
+  block: TextTemBlock;
+  onChange: (val: TextTemBlockValue) => void;
   onRemove: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
@@ -31,10 +42,7 @@ function normalizeValue(value: TestTemBlock['value']): TestTemBlockValue {
   return val;
 }
 
-// Reconstruct assembled plain text for copy
-export function assembleTestTemText(segments: TestTemSegment[]): string {
-  return segments.map(seg => seg.text ?? '').join('');
-}
+
 
 export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }: Props) {
   const [copied, setCopied] = useState(false);
@@ -43,8 +51,8 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
   const pendingFocusFieldId = useRef<string | null>(null);
 
   const { onMouseDown } = useDraggableBlock(
-    { id: block.id, type: 'testtem', value: block.value },
-    '📝 TestTem'
+    { id: block.id, type: block.type, value: block.value },
+    '📝 TextTem'
   );
 
   const blockValue = normalizeValue(block.value);
@@ -144,10 +152,25 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
   // Copy full assembled template text
   const handleCopyAll = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const fullText = assembleTestTemText(segments);
+    const fullText = assembleTextTemText(segments);
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  // Clear contents of all small rectangular text fields while keeping fields and text intact
+  const handleClearTextFields = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const updatedSegments = segments.map((seg) => {
+      if (seg.type === 'field') {
+        return { ...seg, text: '' };
+      }
+      return seg;
+    });
+
+    onChange({ segments: updatedSegments });
   };
 
   return (
@@ -169,7 +192,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
             </div>
           )}
           <FileCode size={15} className="text-amber-600" />
-          <span className="text-xs font-semibold text-stone-800">TestTem</span>
+          <span className="text-xs font-semibold text-stone-800">TextTem</span>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -193,7 +216,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
 
           <button 
             onClick={onRemove}
-            title="Delete TestTem"
+            title="Delete TextTem"
             className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-red-500 transition-all ml-1"
           >
             &times;
@@ -237,16 +260,28 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
         </div>
 
         {/* Action button bar */}
-        <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={handleAddInlineField}
-            title="Insert inline editable text field at cursor"
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50/90 hover:bg-amber-100 hover:text-amber-900 border border-amber-200 rounded-md transition-all shadow-2xs cursor-pointer active:scale-95"
-          >
-            <Plus size={13} />
-            <span>Add Text</span>
-          </button>
+        <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleAddInlineField}
+              title="Insert inline editable text field at cursor"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50/90 hover:bg-amber-100 hover:text-amber-900 border border-amber-200 rounded-md transition-all shadow-2xs cursor-pointer active:scale-95"
+            >
+              <Plus size={13} />
+              <span>Add Text</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearTextFields}
+              title="Clear contents of all rectangular text fields"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 hover:text-stone-900 border border-stone-200 rounded-md transition-all shadow-2xs cursor-pointer active:scale-95"
+            >
+              <Eraser size={12} className="text-stone-500" />
+              <span>Clear Text Fields</span>
+            </button>
+          </div>
 
           <span className="text-[10px] text-stone-400">
             {segments.filter(s => s.type === 'field').length} inline {segments.filter(s => s.type === 'field').length === 1 ? 'field' : 'fields'}
@@ -363,3 +398,6 @@ const InlineTextSegment = React.memo(function InlineTextSegment({
     />
   );
 });
+
+export const TextTemBlockView = TestTemBlockView;
+

@@ -241,14 +241,14 @@ function PhotoUploadButton() {
   );
 }
 
-function TestTemBlockDraggable() {
+function TextTemBlockDraggable() {
   const { selectedNoteId } = useAppStore();
   const payload = { 
     id: 'template-testtem', 
     type: 'testtem' as const, 
     value: { segments: [{ type: 'text' as const, id: crypto.randomUUID(), text: '' }] } 
   };
-  const { onMouseDown } = useDraggableBlock(payload, '📝 TestTem');
+  const { onMouseDown } = useDraggableBlock(payload, '📝 TextTem');
 
   const handleClick = async () => {
     if (!selectedNoteId) return;
@@ -280,14 +280,16 @@ function TestTemBlockDraggable() {
     <div
       onMouseDown={onMouseDown}
       onClick={handleClick}
-      title="Drag or tap to add TestTem to note"
+      title="Drag or tap to add TextTem to note"
       className="flex items-center space-x-2 px-3 py-1.5 bg-white border border-stone-200 rounded-md cursor-grab active:cursor-grabbing hover:bg-stone-100 hover:border-stone-300 transition-all shadow-sm select-none shrink-0"
     >
       <FileCode size={14} className="text-amber-600" />
-      <span className="text-sm font-medium text-stone-700">TestTem</span>
+      <span className="text-sm font-medium text-stone-700">TextTem</span>
     </div>
   );
 }
+
+const TestTemBlockDraggable = TextTemBlockDraggable;
 
 export function BlocksTab() {
   return (
@@ -296,7 +298,7 @@ export function BlocksTab() {
       <PingBlockDraggable />
       <JobBlockDraggable />
       <ScheduleBlockDraggable />
-      <TestTemBlockDraggable />
+      <TextTemBlockDraggable />
     </div>
   );
 }

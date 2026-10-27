@@ -54,7 +54,7 @@ export function RightPanel() {
       const tripParsed = parseTripToGoContent(note.content);
       const oilParsed = parseOilTravelContent(tripParsed.text);
       const noteContent = parseNoteContent(oilParsed.text);
-      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem'].includes(payload.id);
+      const isTemplate = ['template-password', 'template-ping', 'template-job', 'template-schedule', 'template-testtem', 'template-texttem'].includes(payload.id);
 
       // If it's an existing block already in the note, do not duplicate
       if (!isTemplate && noteContent.blocks.some(b => b.id === payload.id)) {
@@ -332,7 +332,9 @@ export function RightPanel() {
                     case 'ping': return 'Ping Signal';
                     case 'job': return 'Job Progress';
                     case 'schedule': return 'Work Schedule';
-                    case 'testtem': return 'TestTem Template';
+                    case 'testtem':
+                    case 'texttem':
+                      return 'TextTem Template';
                     default: return 'Block';
                   }
                 };
@@ -419,7 +421,7 @@ export function RightPanel() {
                           onRemove={() => removeBlock(index)}
                         />
                       )}
-                      {block.type === 'testtem' && (
+                      {(block.type === 'testtem' || block.type === 'texttem') && (
                         <TestTemBlockView 
                           block={block as any}
                           onChange={(val) => updateBlock(index, val)}

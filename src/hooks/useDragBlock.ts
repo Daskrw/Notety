@@ -2,7 +2,7 @@ import { useCallback, useRef, useEffect } from 'react';
 
 export interface DragBlockPayload {
   id: string;
-  type: 'password' | 'ping' | 'job' | 'schedule' | 'testtem';
+  type: 'password' | 'ping' | 'job' | 'schedule' | 'testtem' | 'texttem';
   value: any;
 }
 
