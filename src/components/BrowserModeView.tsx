@@ -1,40 +1,44 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Globe, 
-  Plus, 
-  X, 
-  RotateCw, 
-  ArrowLeft, 
-  ArrowRight, 
-  ExternalLink, 
-  Lock, 
-  Search, 
-  ShieldCheck, 
+import {
+  Globe,
+  Plus,
+  X,
+  RotateCw,
+  ArrowLeft,
+  ArrowRight,
+  ExternalLink,
+  Lock,
+  Search,
+  ShieldCheck,
+  Shield,
   Info,
 } from 'lucide-react';
-import { 
-  BrowserTab, 
-  DEFAULT_HOMEPAGE, 
-  normalizeBrowserUrl, 
-  validateUrlSafety, 
-  getFriendlyTabTitle, 
-  loadSavedBrowserState, 
-  saveBrowserState, 
-  checkIsTauri, 
-  nativeCreateTab, 
-  nativeSwitchTab, 
-  nativeNavigate, 
-  nativeReload, 
+import {
+  BrowserTab,
+  DEFAULT_HOMEPAGE,
+  normalizeBrowserUrl,
+  validateUrlSafety,
+  getFriendlyTabTitle,
+  loadSavedBrowserState,
+  saveBrowserState,
+  checkIsTauri,
+  nativeCreateTab,
+  nativeSwitchTab,
+  nativeNavigate,
+  nativeReload,
   nativeBack,
   nativeForward,
-  nativeCloseTab, 
+  nativeCloseTab,
   nativeUpdateBounds,
   nativeHideAll,
   nativeCleanupAll,
-  nativeGetUrl
+  nativeGetUrl,
+  captureProtectionSetEnabled,
+  captureProtectionIsEnabled
 } from '@/lib/browser';
 import { openExternalUrl } from './NoteEditor';
+import { useAppStore } from '@/store/useStore';
 
 interface BrowserModeViewProps {
   onCloseMode?: () => void;
@@ -43,7 +47,7 @@ interface BrowserModeViewProps {
 
 export function BrowserModeView({ onCloseMode, isActive = true }: BrowserModeViewProps) {
   // Load saved tabs from local-first persistence
-  const [tabsState, setTabsState] = useState<{ tabs: BrowserTab[]; activeTabId: string }>(() => 
+  const [tabsState, setTabsState] = useState<{ tabs: BrowserTab[]; activeTabId: string }>(() =>
     loadSavedBrowserState()
   );
   const { tabs, activeTabId } = tabsState;
@@ -54,6 +58,9 @@ export function BrowserModeView({ onCloseMode, isActive = true }: BrowserModeVie
   const [isNavigating, setIsNavigating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // User profile for capture protection setting
+  const userProfile = useAppStore(state => state.userProfile);
+
   const viewportRef = useRef<HTMLDivElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +68,18 @@ export function BrowserModeView({ onCloseMode, isActive = true }: BrowserModeVie
   useEffect(() => {
     checkIsTauri().then(setIsTauriDesktop);
   }, []);
+
+  // Capture Protection: Enable when DevMode is active, setting is on, and on Tauri desktop
+  useEffect(() => {
+    if (!isTauriDesktop) return;
+
+    const enableProtection = async () => {
+      const shouldEnable = isActive && userProfile?.devmode_capture_protection === true;
+      await captureProtectionSetEnabled(shouldEnable);
+    };
+
+    enableProtection();
+  }, [isActive, isTauriDesktop, userProfile?.devmode_capture_protection]);
 
   // Sync address input when active tab changes
   useEffect(() => {
@@ -434,6 +453,12 @@ export function BrowserModeView({ onCloseMode, isActive = true }: BrowserModeVie
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-stone-500 bg-stone-300/40 border border-stone-300 shrink-0">
           <ShieldCheck size={11} className="text-emerald-600" />
           <span>{isTauriDesktop ? 'WebView2 Desktop' : 'Web Sandbox'}</span>
+          {isTauriDesktop && userProfile?.devmode_capture_protection && (
+            <span title="Screen Capture Protection Active" className="flex items-center gap-1">
+              <Shield size={11} className="text-emerald-600" />
+              <span className="text-emerald-600">Protected</span>
+            </span>
+          )}
         </div>
       </div>
 

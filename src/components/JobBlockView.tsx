@@ -3,6 +3,7 @@ import { Briefcase, GripVertical, CheckCircle2, Circle, RotateCcw, Plus, Trash2,
 import { JobBlock, JobBlockValue, JobTaskItem } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
 import { useAppStore } from '@/store/useStore';
+import { StableInput } from './StableInput';
 import { 
   applyFirstEntryTimestamp, 
   formatFirstEntryTimestamp, 
@@ -323,10 +324,10 @@ export function JobBlockView({ block, onChange, onRemove, dragHandleProps }: Pro
                   )}
                 </button>
 
-                <input
+                <StableInput
                   type="text"
                   value={task.text}
-                  onChange={(e) => handleTaskTextChange(idx, e.target.value)}
+                  onChange={(val) => handleTaskTextChange(idx, val)}
                   placeholder={`Task ${idx + 1}...`}
                   className={`flex-1 bg-transparent outline-none text-xs font-sans transition-colors ${
                     isDone ? 'text-green-900 font-medium line-through opacity-80' : 'text-stone-700 placeholder:text-stone-300'

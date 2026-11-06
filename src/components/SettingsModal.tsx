@@ -4,7 +4,7 @@ import { db, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import { createSnippet, updateSnippet, deleteSnippet } from '@/lib/data';
-import { Settings, X, Plus, Trash2, Edit2, Check, Save } from 'lucide-react';
+import { Settings, X, Plus, Trash2, Edit2, Check, Save, Shield, ShieldOff } from 'lucide-react';
 
 export function SettingsModal() {
   const { isSettingsModalOpen, setIsSettingsModalOpen, userProfile, setUserProfile } = useAppStore();
@@ -23,6 +23,7 @@ export function SettingsModal() {
   const [prefix, setPrefix] = useState(userProfile?.shortcut_prefix ?? '!');
   const [triggerKey, setTriggerKey] = useState(userProfile?.shortcut_trigger_key ?? 'Tab');
   const [enableClickableLinks, setEnableClickableLinks] = useState(userProfile?.enable_clickable_links ?? true);
+  const [enableCaptureProtection, setEnableCaptureProtection] = useState(userProfile?.devmode_capture_protection ?? false);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   if (!isSettingsModalOpen) return null;
@@ -30,29 +31,31 @@ export function SettingsModal() {
   const handleSavePreferences = async () => {
     if (!user) return;
     setIsSavingPrefs(true);
-    
+
     // If prefix is literally empty, we allow it. (Null or undefined from DB is handled differently, but here state is string)
     const finalPrefix = prefix;
     const finalTrigger = triggerKey || 'Tab';
-    
+
     const { data, error } = await supabase
       .from('profiles')
-      .update({ 
+      .update({
         shortcut_prefix: finalPrefix,
         shortcut_trigger_key: finalTrigger,
-        enable_clickable_links: enableClickableLinks
+        enable_clickable_links: enableClickableLinks,
+        devmode_capture_protection: enableCaptureProtection
       })
       .eq('id', user.id)
       .select()
       .single();
-      
+
     if (error) {
       // Fallback local update if column not yet added to SQL
       const updatedProfile = {
         ...(userProfile || { id: user.id, username: '', display_name: '', avatar_seed: '', created_at: '' }),
         shortcut_prefix: finalPrefix,
         shortcut_trigger_key: finalTrigger,
-        enable_clickable_links: enableClickableLinks
+        enable_clickable_links: enableClickableLinks,
+        devmode_capture_protection: enableCaptureProtection
       };
       setUserProfile(updatedProfile);
     } else if (data) {
@@ -60,8 +63,9 @@ export function SettingsModal() {
       setPrefix(data.shortcut_prefix);
       setTriggerKey(data.shortcut_trigger_key);
       setEnableClickableLinks(data.enable_clickable_links ?? true);
+      setEnableCaptureProtection(data.devmode_capture_protection ?? false);
     }
-    
+
     setIsSavingPrefs(false);
   };
 
@@ -141,9 +145,10 @@ export function SettingsModal() {
               <button
                 onClick={handleSavePreferences}
                 disabled={isSavingPrefs || (
-                  prefix === (userProfile?.shortcut_prefix ?? '!') && 
+                  prefix === (userProfile?.shortcut_prefix ?? '!') &&
                   triggerKey === (userProfile?.shortcut_trigger_key ?? 'Tab') &&
-                  enableClickableLinks === (userProfile?.enable_clickable_links ?? true)
+                  enableClickableLinks === (userProfile?.enable_clickable_links ?? true) &&
+                  enableCaptureProtection === (userProfile?.devmode_capture_protection ?? false)
                 )}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 text-white rounded-lg text-xs font-medium hover:bg-stone-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
               >
@@ -188,10 +193,30 @@ export function SettingsModal() {
                 <p className="text-[11px] text-stone-500">Detect web links (http://, https://, www) and allow direct clicking / opening.</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input 
+                <input
                   type="checkbox"
                   checked={enableClickableLinks}
                   onChange={(e) => setEnableClickableLinks(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-stone-900"></div>
+              </label>
+            </div>
+
+            {/* DevMode Screen Capture Protection Option */}
+            <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-stone-800 flex items-center gap-2">
+                  <Shield className="w-3.5 h-3.5 text-stone-600" />
+                  DevMode Screen Capture Protection
+                </span>
+                <p className="text-[11px] text-stone-500">Exclude DevMode browser windows from screen captures, recordings, and screenshots (Windows only).</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableCaptureProtection}
+                  onChange={(e) => setEnableCaptureProtection(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-9 h-5 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-stone-900"></div>

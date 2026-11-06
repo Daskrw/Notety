@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
 import { PasswordBlock } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
+import { StableInput } from './StableInput';
 
 interface Props {
   block: PasswordBlock;
@@ -49,10 +50,10 @@ export function PasswordBlockView({ block, onChange, onRemove, dragHandleProps }
       >
         {isVisible ? <EyeOff size={18} className="text-stone-600" /> : <Eye size={18} className="text-stone-600" />}
       </div>
-      <input
+      <StableInput
         type={isVisible ? "text" : "password"}
-        value={block.value}
-        onChange={(e) => onChange(e.target.value)}
+        value={block.value || ''}
+        onChange={(val) => onChange(val)}
         placeholder="Secret password..."
         className="flex-1 px-4 py-2 bg-transparent outline-none text-stone-800 text-sm font-mono placeholder:text-stone-400 placeholder:font-sans"
       />

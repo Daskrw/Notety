@@ -5,12 +5,11 @@ import { db, Note, Snippet } from '@/lib/db';
 import { useAppStore, useAuthStore } from '@/store/useStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { updateNote, deleteNote } from '@/lib/data';
-import { Star, Trash2, PanelRightOpen, Menu, FileText, Map, Fuel, Globe, Image as ImageIcon, Loader2, Code2 } from 'lucide-react';
+import { Star, Trash2, PanelRightOpen, Menu, FileText, Fuel, Globe, Image as ImageIcon, Loader2, Code2 } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { parseNoteContent, serializeNoteContent, EditorBlock, ImageBlock } from '@/lib/blocks';
 import { BlocksTab } from './BlocksTab';
 import { ImageBlockView } from './ImageBlockView';
-import { TripToGoView } from './TripToGoView';
 import { isTripToGoContent, parseTripToGoContent, serializeTripToGoContent, TripToGoData } from '@/lib/triptogo';
 import { OilTravelView } from './OilTravelView';
 import { isOilTravelContent, parseOilTravelContent, serializeOilTravelContent, OilTravelData } from '@/lib/oiltravel';
@@ -394,7 +393,7 @@ export function NoteEditor() {
     }
   }, [selectedNoteId, allNotes, setSelectedNoteId]);
 
-  const [viewMode, setViewMode] = useState<'standard' | 'triptogo' | 'oiltravel' | 'browser'>('standard');
+  const [viewMode, setViewMode] = useState<'standard' | 'oiltravel' | 'browser'>('standard');
 
   // When switching notes, always open in standard Notes mode by default
   useEffect(() => {
@@ -421,29 +420,22 @@ export function NoteEditor() {
   // Split document into alternating text and document-style image segments
   const documentSegments = useMemo(() => splitTextIntoSegments(noteContent.text), [noteContent.text]);
 
-  const handleToggleMode = async (mode: 'standard' | 'triptogo' | 'oiltravel' | 'browser') => {
-    if (mode === 'browser') {
+  const handleToggleMode = async (mode: 'standard' | 'oiltravel' | 'browser') => {
+    // Safely fallback if legacy triptogo mode is somehow supplied
+    const targetMode = (mode as string) === 'triptogo' ? 'standard' : mode;
+    if (targetMode === 'browser') {
       setAppMode('browser');
     } else {
       setAppMode('notes');
     }
-    setViewMode(mode);
-    if (mode !== 'browser') {
+    setViewMode(targetMode);
+    if (targetMode !== 'browser') {
       const saved = loadSavedBrowserState();
       nativeHideAll(saved.tabs.map(t => t.id));
     }
     if (!localNote) return;
     
-    if (mode === 'triptogo' && !isTripToGoContent(localNote.content)) {
-      const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
-      let contentWithOil = isOilTravelContent(localNote.content)
-        ? serializeOilTravelContent(baseContent, oilParsed.data)
-        : baseContent;
-      const serialized = serializeTripToGoContent(contentWithOil, tripParsed.data);
-      const updated = { ...localNote, content: serialized };
-      setLocalNote(updated);
-      if (user) await updateNote(localNote.id, user.id, { content: serialized });
-    } else if (mode === 'oiltravel' && !isOilTravelContent(localNote.content)) {
+    if (targetMode === 'oiltravel' && !isOilTravelContent(localNote.content)) {
       const baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
       let serialized = serializeOilTravelContent(baseContent, oilParsed.data);
       if (isTripToGoContent(localNote.content)) {
@@ -461,7 +453,7 @@ export function NoteEditor() {
     let serialized = isOilTravelContent(localNote.content) || viewMode === 'oiltravel'
       ? serializeOilTravelContent(baseContent, oilParsed.data)
       : baseContent;
-    if (isTripToGoContent(localNote.content) || viewMode === 'triptogo') {
+    if (isTripToGoContent(localNote.content)) {
       serialized = serializeTripToGoContent(serialized, tripParsed.data);
     }
       
@@ -669,19 +661,6 @@ export function NoteEditor() {
     }
   };
 
-  const handleTripDataChange = (newData: TripToGoData) => {
-    if (!localNote) return;
-    let baseContent = serializeNoteContent(noteContent.text, noteContent.blocks);
-    if (isOilTravelContent(localNote.content)) {
-      baseContent = serializeOilTravelContent(baseContent, oilParsed.data);
-    }
-    const serialized = serializeTripToGoContent(baseContent, newData);
-    const updated = { ...localNote, content: serialized };
-    setLocalNote(updated);
-    if (user) {
-      updateNote(localNote.id, user.id, { content: serialized }).catch(console.error);
-    }
-  };
 
   const handleOilTravelDataChange = (newData: OilTravelData) => {
     if (!localNote) return;
@@ -713,7 +692,6 @@ export function NoteEditor() {
     if (!isRightPanelPinned) setRightPanelHovered(false);
   };
 
-  const isTripMode = viewMode === 'triptogo';
   const isOilMode = viewMode === 'oiltravel';
   const isDevtoolActive = appMode === 'browser' || viewMode === 'browser';
 
@@ -738,28 +716,12 @@ export function NoteEditor() {
                 <span className="inline">Note</span>
               </button>
               <button
-                onClick={() => handleToggleMode('triptogo')}
-                title="TripToGo Flowchart Mode"
-                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
-              >
-                <Map size={12} />
-                <span className="inline">TripToGo</span>
-              </button>
-              <button
                 onClick={() => handleToggleMode('oiltravel')}
                 title="Oil Travel Mode"
                 className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
               >
                 <Fuel size={12} />
                 <span className="inline">Oil Travel</span>
-              </button>
-              <button
-                onClick={() => handleToggleMode('browser')}
-                title="Multi-Tab Devtool Mode"
-                className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all bg-blue-600 text-white shadow-2xs font-semibold"
-              >
-                <Code2 size={12} />
-                <span className="inline">Devtool</span>
               </button>
             </div>
           </div>
@@ -778,13 +740,6 @@ export function NoteEditor() {
                   <span>Open Notes</span>
                 </button>
               </div>
-              <button 
-                onClick={() => handleToggleMode('browser')} 
-                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors shadow-2xs"
-              >
-                <Code2 className="w-3.5 h-3.5" />
-                <span>Open Devtool Mode</span>
-              </button>
             </div>
             <div className="flex-1 flex flex-col items-center justify-center text-stone-400 gap-3">
               <p className="text-sm font-medium tracking-wide">Select a note to start writing</p>
@@ -826,7 +781,7 @@ export function NoteEditor() {
             ))}
           </select>
 
-          {/* Mode Switcher: Note vs TripToGo vs Oil Travel */}
+          {/* Mode Switcher: Note vs Oil Travel */}
           <div className="flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200/60 shrink-0">
             <button
               onClick={() => handleToggleMode('standard')}
@@ -841,18 +796,6 @@ export function NoteEditor() {
               <span className="inline">Note</span>
             </button>
             <button
-              onClick={() => handleToggleMode('triptogo')}
-              title="TripToGo Flowchart Mode"
-              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
-                viewMode === 'triptogo' 
-                  ? 'bg-amber-500 text-white shadow-2xs font-semibold' 
-                  : 'text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              <Map size={12} />
-              <span className="inline">TripToGo</span>
-            </button>
-            <button
               onClick={() => handleToggleMode('oiltravel')}
               title="Oil Travel Mode"
               className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all ${
@@ -863,14 +806,6 @@ export function NoteEditor() {
             >
               <Fuel size={12} />
               <span className="inline">Oil Travel</span>
-            </button>
-            <button
-              onClick={() => handleToggleMode('browser')}
-              title="Multi-Tab Devtool Mode"
-              className="px-2 sm:px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-all text-stone-500 hover:text-stone-800"
-            >
-              <Code2 size={12} />
-              <span className="inline">Devtool</span>
             </button>
           </div>
 
@@ -946,22 +881,6 @@ export function NoteEditor() {
           <OilTravelView
             data={oilParsed.data}
             onChange={handleOilTravelDataChange}
-          />
-        </div>
-      ) : isTripMode ? (
-        <div className="flex-1 overflow-y-auto w-full custom-scrollbar bg-stone-50/40">
-          <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-            <input
-              type="text"
-              value={localNote.title}
-              onChange={(e) => setLocalNote({ ...localNote, title: e.target.value })}
-              placeholder="Trip Title (e.g. Tokyo 5 Days Itinerary)"
-              className="w-full text-xl sm:text-2xl md:text-3xl font-heading font-bold text-stone-900 bg-transparent border-none outline-none placeholder:text-stone-300 mb-2 cursor-text"
-            />
-          </div>
-          <TripToGoView
-            data={tripParsed.data}
-            onChange={handleTripDataChange}
           />
         </div>
       ) : (
@@ -1053,7 +972,7 @@ export function NoteEditor() {
         </div>
       )}
       
-      {!isTripMode && <BlocksTab />}
+      <BlocksTab />
           </div>
         )}
       </div>

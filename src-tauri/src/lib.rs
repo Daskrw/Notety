@@ -408,6 +408,272 @@ mod audio_monitor {
   }
 }
 
+// ─────────────────────────────────────────────
+// DevMode Screen Capture Protection (Windows)
+// ─────────────────────────────────────────────
+#[cfg(windows)]
+mod capture_protection {
+  use std::collections::HashSet;
+  use std::sync::{Arc, Mutex};
+  use tauri::{AppHandle, Manager, Window, Webview};
+  use windows::Win32::Foundation::HWND;
+  use windows::Win32::Graphics::Dwm::DwmGetWindowAttribute;
+  use windows::Win32::Graphics::Dwm::DWMWA_CLOAK;
+  use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetClassNameW, GetWindow, GetWindowThreadProcessId, GW_CHILD, GW_HWNDNEXT,
+    IsWindowVisible, SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
+  };
+
+  /// Global state tracking which HWNDs have capture protection applied
+  #[derive(Default)]
+  pub struct CaptureProtectionState {
+    protected_hwnds: Mutex<HashSet<isize>>,
+    enabled: Mutex<bool>,
+  }
+
+  impl CaptureProtectionState {
+    pub fn new() -> Arc<Self> {
+      Arc::new(Self::default())
+    }
+
+    pub fn is_enabled(&self) -> bool {
+      *self.enabled.lock().unwrap()
+    }
+
+    pub fn set_enabled(&self, enabled: bool) {
+      *self.enabled.lock().unwrap() = enabled;
+    }
+
+    pub fn add_protected(&self, hwnd: isize) {
+      self.protected_hwnds.lock().unwrap().insert(hwnd);
+    }
+
+    pub fn remove_protected(&self, hwnd: isize) {
+      self.protected_hwnds.lock().unwrap().remove(&hwnd);
+    }
+
+    pub fn get_all_protected(&self) -> Vec<isize> {
+      self.protected_hwnds.lock().unwrap().iter().copied().collect()
+    }
+
+    pub fn clear(&self) {
+      self.protected_hwnds.lock().unwrap().clear();
+    }
+  }
+
+  /// Apply or remove capture protection on a specific HWND
+  unsafe fn set_capture_protection(hwnd: HWND, enable: bool) -> Result<(), String> {
+    let affinity = if enable { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE };
+    let result = SetWindowDisplayAffinity(hwnd, affinity);
+    if result.is_err() {
+      return Err(format!("SetWindowDisplayAffinity failed for HWND {:?}: {:?}", hwnd.0, result));
+    }
+    Ok(())
+  }
+
+  /// Get all child HWNDs of a parent window (for WebView2 children)
+  unsafe fn get_child_hwnds(parent_hwnd: HWND) -> Vec<HWND> {
+    let mut children = Vec::new();
+    let mut child = GetWindow(parent_hwnd, GW_CHILD);
+    while let Ok(hwnd) = child {
+      if hwnd.0 == std::ptr::null_mut() {
+        break;
+      }
+      children.push(hwnd);
+      child = GetWindow(hwnd, GW_HWNDNEXT);
+    }
+    children
+  }
+
+  /// Check if a window is a WebView2 by class name
+  unsafe fn is_webview2_window(hwnd: HWND) -> bool {
+    let mut class_name = [0u16; 256];
+    let len = GetClassNameW(hwnd, &mut class_name);
+    if len > 0 {
+      let class_str = String::from_utf16_lossy(&class_name[..len as usize]);
+      // WebView2 uses "Chrome_WidgetWin_1" or similar class names
+      // Also check for "WebView2" in the class name
+      class_str.contains("Chrome_WidgetWin") || class_str.contains("WebView2")
+    } else {
+      false
+    }
+  }
+
+  /// Find all WebView2 child windows belonging to our process
+  unsafe fn find_our_webview2_hwnds(parent_hwnd: HWND, our_pid: u32) -> Vec<HWND> {
+    let mut result = Vec::new();
+    let children = get_child_hwnds(parent_hwnd);
+
+    for child in children {
+      let mut pid = 0u32;
+      GetWindowThreadProcessId(child, Some(&mut pid));
+      if pid == our_pid && IsWindowVisible(child).as_bool() {
+        if is_webview2_window(child) {
+          result.push(child);
+        }
+        // Also recursively check grandchildren (WebView2 may have nested windows)
+        let grandchildren = get_child_hwnds(child);
+        for gc in grandchildren {
+          let mut gc_pid = 0u32;
+          GetWindowThreadProcessId(gc, Some(&mut gc_pid));
+          if gc_pid == our_pid && IsWindowVisible(gc).as_bool() && is_webview2_window(gc) {
+            result.push(gc);
+          }
+        }
+      }
+    }
+    result
+  }
+
+  /// Apply capture protection to main window and all WebView2 children
+  pub fn apply_capture_protection(app: &AppHandle, state: &CaptureProtectionState, enable: bool) {
+    log::info!("[CaptureProtection] Applying capture protection: enable={}", enable);
+    state.set_enabled(enable);
+
+    // Get main window
+    let main_window = match app.get_webview_window("main") {
+      Some(w) => w,
+      None => {
+        log::warn!("[CaptureProtection] Main window not found");
+        return;
+      }
+    };
+
+    // Get main window HWND
+    let main_hwnd = match main_window.hwnd() {
+      Ok(h) => h,
+      Err(e) => {
+        log::warn!("[CaptureProtection] Failed to get main window HWND: {}", e);
+        return;
+      }
+    };
+    let our_pid = std::process::id();
+
+    if enable {
+      // Protect main window
+      unsafe {
+        if let Err(e) = set_capture_protection(main_hwnd, true) {
+          log::warn!("[CaptureProtection] Failed to protect main window: {}", e);
+        } else {
+          state.add_protected(main_hwnd.0 as isize);
+          log::info!("[CaptureProtection] Protected main window HWND: {:?}", main_hwnd.0);
+        }
+
+        // Protect all WebView2 children
+        let webview_hwnds = find_our_webview2_hwnds(main_hwnd, our_pid);
+        for hwnd in webview_hwnds {
+          if let Err(e) = set_capture_protection(hwnd, true) {
+            log::warn!("[CaptureProtection] Failed to protect WebView2 HWND {:?}: {}", hwnd.0, e);
+          } else {
+            state.add_protected(hwnd.0 as isize);
+            log::info!("[CaptureProtection] Protected WebView2 HWND: {:?}", hwnd.0);
+          }
+        }
+      }
+    } else {
+      // Remove protection from all tracked HWNDs
+      let protected = state.get_all_protected();
+      for hwnd in protected {
+        unsafe {
+          if let Err(e) = set_capture_protection(HWND(hwnd as *mut _), false) {
+            log::warn!("[CaptureProtection] Failed to remove protection from HWND {:?}: {}", hwnd, e);
+          } else {
+            log::info!("[CaptureProtection] Removed protection from HWND: {:?}", hwnd);
+          }
+        }
+      }
+      state.clear();
+    }
+  }
+
+  /// Apply capture protection to a newly created WebView2 tab
+  pub fn protect_new_webview(app: &AppHandle, state: &CaptureProtectionState, tab_id: &str) {
+    if !state.is_enabled() {
+      return;
+    }
+
+    let label = format!("tab_{}", tab_id.replace('-', "_"));
+    log::info!("[CaptureProtection] Attempting to protect new WebView2 tab: {}", label);
+
+    // Get main window to find the new WebView2 child
+    let main_window = match app.get_webview_window("main") {
+      Some(w) => w,
+      None => {
+        log::warn!("[CaptureProtection] Main window not found");
+        return;
+      }
+    };
+
+    let main_hwnd = match main_window.hwnd() {
+      Ok(h) => h,
+      Err(e) => {
+        log::warn!("[CaptureProtection] Failed to get main window HWND: {}", e);
+        return;
+      }
+    };
+
+    let our_pid = std::process::id();
+
+    // Find the newly created WebView2 child window
+    unsafe {
+      let webview_hwnds = find_our_webview2_hwnds(main_hwnd, our_pid);
+      for hwnd in webview_hwnds {
+        // Check if this HWND is already protected
+        let protected = state.get_all_protected();
+        if protected.contains(&(hwnd.0 as isize)) {
+          continue; // Already protected
+        }
+
+        if let Err(e) = set_capture_protection(hwnd, true) {
+          log::warn!("[CaptureProtection] Failed to protect WebView2 HWND {:?}: {}", hwnd.0, e);
+        } else {
+          state.add_protected(hwnd.0 as isize);
+          log::info!("[CaptureProtection] Protected new WebView2 tab '{}' HWND: {:?}", label, hwnd.0);
+        }
+      }
+    }
+  }
+
+  /// Remove capture protection from a WebView2 tab being closed
+  pub fn unprotect_webview(state: &Arc<CaptureProtectionState>, tab_id: &str) {
+    if !state.is_enabled() {
+      return;
+    }
+
+    let label = format!("tab_{}", tab_id.replace('-', "_"));
+    log::info!("[CaptureProtection] Unprotecting WebView2 tab: {}", label);
+
+    // We can't easily get the HWND by label after it's closed,
+    // but we track it in state. The HWND will be cleaned up when
+    // the full protection is disabled or app closes.
+    // For now, we just log - the cleanup happens on disable.
+  }
+}
+
+#[cfg(not(windows))]
+mod capture_protection {
+  use std::sync::Arc;
+  use tauri::AppHandle;
+
+  pub struct CaptureProtectionState;
+
+  impl CaptureProtectionState {
+    pub fn new() -> Arc<Self> {
+      Arc::new(Self)
+    }
+    pub fn is_enabled(&self) -> bool { false }
+    pub fn set_enabled(&self, _enabled: bool) {}
+    pub fn add_protected(&self, _hwnd: isize) {}
+    pub fn remove_protected(&self, _hwnd: isize) {}
+    pub fn get_all_protected(&self) -> Vec<isize> { vec![] }
+    pub fn clear(&self) {}
+  }
+
+  pub fn apply_capture_protection(_app: &AppHandle, _state: &Arc<CaptureProtectionState>, _enable: bool) {}
+  pub fn protect_new_webview(_app: &AppHandle, _state: &Arc<CaptureProtectionState>, _tab_id: &str) {}
+  pub fn unprotect_webview(_state: &Arc<CaptureProtectionState>, _tab_id: &str) {}
+}
+
 pub fn pause_all_child_webviews(app: &tauri::AppHandle) {
   let pause_js = r#"
     try {
@@ -498,6 +764,12 @@ async fn browser_create_tab(
   let _ = child.set_size(size);
   let _ = child.show();
   let _ = child.set_focus();
+
+  // Apply capture protection to newly created WebView2 if enabled
+  if let Some(state) = app.try_state::<capture_protection::CaptureProtectionState>() {
+    capture_protection::protect_new_webview(&app, &state, &tab_id);
+  }
+
   Ok(())
 }
 
@@ -617,6 +889,34 @@ async fn browser_get_url(app: tauri::AppHandle, tab_id: String) -> Result<String
   Err("Tab not found".to_string())
 }
 
+// ─────────────────────────────────────────────
+// Capture Protection Commands
+// ─────────────────────────────────────────────
+
+#[tauri::command]
+async fn capture_protection_set_enabled(
+  app: tauri::AppHandle,
+  enabled: bool,
+) -> Result<(), String> {
+  if let Some(state) = app.try_state::<capture_protection::CaptureProtectionState>() {
+    capture_protection::apply_capture_protection(&app, &state, enabled);
+    Ok(())
+  } else {
+    Err("Capture protection state not found".to_string())
+  }
+}
+
+#[tauri::command]
+async fn capture_protection_is_enabled(
+  app: tauri::AppHandle,
+) -> Result<bool, String> {
+  if let Some(state) = app.try_state::<capture_protection::CaptureProtectionState>() {
+    Ok(state.is_enabled())
+  } else {
+    Ok(false)
+  }
+}
+
 struct AudioMonitorFlag(std::sync::Arc<std::sync::atomic::AtomicBool>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -625,11 +925,15 @@ pub fn run() {
     .plugin(tauri_plugin_opener::init())
     .on_window_event(|window, event| {
       // Deterministic shutdown: When main window receives CloseRequested (via X or Alt+F4),
-      // cleanly stop the audio monitor thread and close all child WebView2 instances.
+      // cleanly stop the audio monitor thread, disable capture protection, and close all child WebView2 instances.
       if let tauri::WindowEvent::CloseRequested { .. } = event {
         if window.label() == "main" {
           if let Some(flag) = window.try_state::<AudioMonitorFlag>() {
             flag.0.store(false, std::sync::atomic::Ordering::Relaxed);
+          }
+          // Disable capture protection on shutdown
+          if let Some(state) = window.app_handle().try_state::<capture_protection::CaptureProtectionState>() {
+            capture_protection::apply_capture_protection(&window.app_handle(), state.inner(), false);
           }
           let app = window.app_handle();
           for (label, wv) in app.webviews() {
@@ -652,12 +956,18 @@ pub fn run() {
       browser_hide_all,
       browser_cleanup_all,
       browser_get_url,
-      browser_pause_media
+      browser_pause_media,
+      capture_protection_set_enabled,
+      capture_protection_is_enabled
     ])
     .setup(|app| {
       let handle = app.handle().clone();
       let monitor_flag = audio_monitor::start_audio_monitor(handle);
       app.manage(AudioMonitorFlag(monitor_flag));
+
+      // Initialize capture protection state
+      let capture_state = capture_protection::CaptureProtectionState::new();
+      app.manage(capture_state);
 
       if cfg!(debug_assertions) {
         app.handle().plugin(

@@ -43,6 +43,7 @@ export interface UserProfile {
   shortcut_prefix?: string;
   shortcut_trigger_key?: string;
   enable_clickable_links?: boolean;
+  devmode_capture_protection?: boolean;
 }
 
 export interface UserActivity {

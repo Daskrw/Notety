@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Activity, GripVertical, Radio, Copy, Check } from 'lucide-react';
 import { PingBlock } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
+import { StableInput } from './StableInput';
 
 interface Props {
   block: PingBlock;
@@ -81,10 +82,10 @@ export function PingBlockView({ block, onChange, onRemove, dragHandleProps }: Pr
         <div className="flex items-center justify-center p-1 text-green-700 shrink-0">
           <Activity size={14} />
         </div>
-        <input
+        <StableInput
           type="text"
           value={block.value || ''}
-          onChange={handleInputChange}
+          onChange={(val) => onChange(val)}
           placeholder="Enter ping code / text..."
           className="flex-1 px-2 py-1 bg-transparent outline-none text-green-900 text-xs font-mono placeholder:text-green-400 font-medium select-text"
         />

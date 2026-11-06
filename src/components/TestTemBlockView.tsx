@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { GripVertical, FileCode, Copy, Check, Plus, X, Eraser } from 'lucide-react';
 import { 
   TextTemBlock, 
@@ -11,6 +11,7 @@ import {
   assembleTestTemText
 } from '@/lib/blocks';
 import { useDraggableBlock } from '@/hooks/useDragBlock';
+import { StableInput } from './StableInput';
 
 export { assembleTextTemText, assembleTestTemText };
 
@@ -55,8 +56,30 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
     '📝 TextTem'
   );
 
-  const blockValue = normalizeValue(block.value);
-  const segments = blockValue.segments;
+  const [segments, setSegments] = useState<TextTemSegment[]>(() => normalizeValue(block.value).segments);
+
+  // Sync external changes
+  useEffect(() => {
+    const nextSegments = normalizeValue(block.value).segments;
+    setSegments(prev => {
+      if (prev.length === nextSegments.length) {
+        let isSame = true;
+        for (let i = 0; i < prev.length; i++) {
+          if (
+            prev[i].id !== nextSegments[i].id ||
+            prev[i].type !== nextSegments[i].type ||
+            prev[i].text !== nextSegments[i].text ||
+            (prev[i] as any).placeholder !== (nextSegments[i] as any).placeholder
+          ) {
+            isSame = false;
+            break;
+          }
+        }
+        if (isSame) return prev;
+      }
+      return nextSegments;
+    });
+  }, [block.value]);
 
   // Auto focus newly created field if requested
   useEffect(() => {
@@ -74,6 +97,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
   // Update text of a specific segment by index
   const handleUpdateSegmentText = (index: number, newText: string) => {
     const updated = segments.map((seg, i) => (i === index ? { ...seg, text: newText } : seg));
+    setSegments(updated);
     onChange({ segments: updated });
   };
 
@@ -96,6 +120,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
       newSegments.push({ type: 'text', id: crypto.randomUUID(), text: '' });
     }
 
+    setSegments(newSegments);
     onChange({ segments: newSegments });
   };
 
@@ -134,6 +159,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
             ...segments.slice(segmentIndex + 1)
           ];
 
+          setSegments(newSegments);
           onChange({ segments: newSegments });
           return;
         }
@@ -146,6 +172,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
       newField,
       { type: 'text' as const, id: crypto.randomUUID(), text: '' }
     ];
+    setSegments(newSegments);
     onChange({ segments: newSegments });
   };
 
@@ -170,6 +197,7 @@ export function TestTemBlockView({ block, onChange, onRemove, dragHandleProps }:
       return seg;
     });
 
+    setSegments(updatedSegments);
     onChange({ segments: updatedSegments });
   };
 
@@ -315,12 +343,12 @@ const InlineFieldSegment = React.memo(function InlineFieldSegment({
 
   return (
     <span className="inline-flex items-center align-baseline mx-0.5 my-0 px-1 py-0 bg-amber-50 border border-amber-300 rounded shadow-2xs hover:border-amber-400 focus-within:ring-1 focus-within:ring-amber-500 focus-within:border-amber-500 select-none transition-all h-[20px]">
-      <input
+      <StableInput
         ref={inputRef}
         data-field-id={fieldId}
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         placeholder={placeholder}
         style={{
           width: `${Math.max(36, ((value || '').length + 1) * 7.5)}px`
@@ -349,6 +377,58 @@ interface InlineTextProps {
   onChange: (newText: string) => void;
 }
 
+function getCaretOffset(element: HTMLElement): number {
+  try {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return 0;
+    const range = sel.getRangeAt(0);
+    if (!element.contains(range.startContainer)) return 0;
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(element);
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
+    return preCaretRange.toString().length;
+  } catch {
+    return 0;
+  }
+}
+
+function setCaretOffset(element: HTMLElement, offset: number) {
+  try {
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    let currentOffset = 0;
+    let found = false;
+
+    function traverse(node: Node) {
+      if (found) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const len = node.textContent?.length || 0;
+        if (currentOffset + len >= offset) {
+          range.setStart(node, Math.min(offset - currentOffset, len));
+          range.collapse(true);
+          found = true;
+          return;
+        }
+        currentOffset += len;
+      } else {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          traverse(node.childNodes[i]);
+          if (found) return;
+        }
+      }
+    }
+
+    traverse(element);
+    if (!found) {
+      range.selectNodeContents(element);
+      range.collapse(false);
+    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } catch {}
+}
+
 const InlineTextSegment = React.memo(function InlineTextSegment({
   text,
   placeholder,
@@ -356,29 +436,58 @@ const InlineTextSegment = React.memo(function InlineTextSegment({
   onChange
 }: InlineTextProps) {
   const spanRef = useRef<HTMLSpanElement>(null);
-  const isSelfTyping = useRef(false);
+  const isSelfTypingRef = useRef(false);
+  const isComposingRef = useRef(false);
 
   // Sync external text to DOM textContent only when not self-typing
-  useEffect(() => {
-    if (isSelfTyping.current) {
-      isSelfTyping.current = false;
+  useLayoutEffect(() => {
+    const span = spanRef.current;
+    if (!span) return;
+
+    const isFocused = typeof document !== 'undefined' && document.activeElement === span;
+
+    // If focused and actively self-typing or composing, preserve DOM completely
+    if (isFocused && (isSelfTypingRef.current || isComposingRef.current)) {
+      isSelfTypingRef.current = false;
       return;
     }
-    if (spanRef.current && spanRef.current.innerText !== text) {
-      spanRef.current.innerText = text;
+
+    // Only update if DOM textContent differs from incoming text prop
+    if (span.textContent !== text) {
+      if (isFocused) {
+        const offset = getCaretOffset(span);
+        span.textContent = text;
+        setCaretOffset(span, offset);
+      } else {
+        span.textContent = text;
+      }
     }
+    isSelfTypingRef.current = false;
   }, [text]);
 
   const updateCursor = () => {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && spanRef.current?.contains(sel.getRangeAt(0).startContainer)) {
-      onCursorChange(sel.getRangeAt(0).startOffset);
+    if (spanRef.current) {
+      const offset = getCaretOffset(spanRef.current);
+      onCursorChange(offset);
     }
   };
 
   const handleInput = (e: React.FormEvent<HTMLSpanElement>) => {
-    isSelfTyping.current = true;
-    const currentText = e.currentTarget.innerText || '';
+    if (isComposingRef.current) return;
+    isSelfTypingRef.current = true;
+    const currentText = spanRef.current?.textContent ?? '';
+    onChange(currentText);
+    updateCursor();
+  };
+
+  const handleCompStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompEnd = (e: React.CompositionEvent<HTMLSpanElement>) => {
+    isComposingRef.current = false;
+    isSelfTypingRef.current = true;
+    const currentText = spanRef.current?.textContent ?? '';
     onChange(currentText);
     updateCursor();
   };
@@ -389,7 +498,10 @@ const InlineTextSegment = React.memo(function InlineTextSegment({
       contentEditable
       suppressContentEditableWarning
       onInput={handleInput}
+      onCompositionStart={handleCompStart}
+      onCompositionEnd={handleCompEnd}
       onKeyUp={updateCursor}
+      onKeyDown={updateCursor}
       onMouseUp={updateCursor}
       onClick={updateCursor}
       onFocus={updateCursor}

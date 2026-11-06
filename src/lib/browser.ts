@@ -319,3 +319,32 @@ export async function listenAudioInterruption(callback: () => void): Promise<() 
     return () => {};
   }
 }
+
+/**
+ * Enable or disable screen capture protection for DevMode browser windows.
+ * Uses Windows SetWindowDisplayAffinity with WDA_EXCLUDEFROMCAPTURE (0x11).
+ * Only applies on Windows Tauri builds; no-op elsewhere.
+ */
+export async function captureProtectionSetEnabled(enabled: boolean): Promise<void> {
+  if (!(await checkIsTauri())) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('capture_protection_set_enabled', { enabled });
+  } catch (err) {
+    console.warn('captureProtectionSetEnabled error:', err);
+  }
+}
+
+/**
+ * Check if screen capture protection is currently enabled.
+ */
+export async function captureProtectionIsEnabled(): Promise<boolean> {
+  if (!(await checkIsTauri())) return false;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const enabled = await invoke<boolean>('capture_protection_is_enabled');
+    return enabled ?? false;
+  } catch {
+    return false;
+  }
+}

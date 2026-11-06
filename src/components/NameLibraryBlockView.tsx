@@ -13,6 +13,7 @@ import {
   BookMarked
 } from 'lucide-react';
 import { NameLibraryBlock, NameLibraryBlockValue } from '@/lib/blocks';
+import { StableInput } from './StableInput';
 import { 
   searchThaiNames, 
   ThaiNameSearchResult, 
@@ -263,11 +264,11 @@ export function NameLibraryBlockView({ block, onChange, onRemove, dragHandleProp
         {/* Search Input Box */}
         <div className="relative flex items-center">
           <Search size={14} className="absolute left-2.5 text-stone-400 pointer-events-none" />
-          <input
+          <StableInput
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
+            onChange={(val) => handleQueryChange(val)}
             placeholder="ค้นหาชื่อไทย (เช่น นภัส, กนก, กมล)..."
             className="w-full pl-8 pr-7 py-1.5 text-xs bg-stone-50/80 hover:bg-stone-50 focus:bg-white border border-stone-200 rounded-md outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-200 transition-all font-sans text-stone-800 placeholder:text-stone-400"
           />

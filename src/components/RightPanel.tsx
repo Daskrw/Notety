@@ -28,10 +28,86 @@ export function RightPanel() {
   const [activeTab, setActiveTab] = useState<'highlights' | 'blocks'>('highlights');
   const panelRef = useRef<HTMLElement>(null);
 
-  const localNote = useLiveQuery(
+  const dbNote = useLiveQuery(
     () => selectedNoteId ? db.notes.get(selectedNoteId) : undefined,
     [selectedNoteId]
   );
+  const [localNote, setLocalNote] = useState<any>(null);
+  const localNoteRef = useRef<any>(null);
+  localNoteRef.current = localNote;
+
+  const hasLocalChangesRef = useRef(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronize dbNote into localNote safely without overwriting active local edits
+  useEffect(() => {
+    if (!selectedNoteId) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      setLocalNote(null);
+      hasLocalChangesRef.current = false;
+      return;
+    }
+    if (!dbNote) return;
+
+    // Switching notes: flush previous note if needed and take dbNote
+    if (dbNote.id !== localNote?.id) {
+      if (saveTimeoutRef.current && localNoteRef.current && hasLocalChangesRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        db.notes.update(localNoteRef.current.id, {
+          content: localNoteRef.current.content,
+          updated_at: Date.now(),
+        }).catch(() => {});
+      }
+      setLocalNote(dbNote);
+      hasLocalChangesRef.current = false;
+      return;
+    }
+
+    // Same note: if no local unsaved edits in blocks, adopt dbNote
+    if (!hasLocalChangesRef.current) {
+      if (dbNote.content !== localNote.content || dbNote.title !== localNote.title) {
+        setLocalNote(dbNote);
+      }
+    } else {
+      // Local has active edits in blocks! Merge external text edits safely without overwriting blocks
+      const dbTrip = parseTripToGoContent(dbNote.content);
+      const dbOil = parseOilTravelContent(dbTrip.text);
+      const dbParsed = parseNoteContent(dbOil.text);
+
+      const localTrip = parseTripToGoContent(localNote.content);
+      const localOil = parseOilTravelContent(localTrip.text);
+      const localParsed = parseNoteContent(localOil.text);
+
+      if (dbParsed.text !== localParsed.text) {
+        const mergedBase = serializeNoteContent(dbParsed.text, localParsed.blocks);
+        let mergedContent = isOilTravelContent(localNote.content)
+          ? serializeOilTravelContent(mergedBase, localOil.data)
+          : mergedBase;
+        if (isTripToGoContent(localNote.content)) {
+          mergedContent = serializeTripToGoContent(mergedContent, localTrip.data);
+        }
+        setLocalNote({ ...localNote, content: mergedContent });
+      }
+    }
+  }, [selectedNoteId, dbNote]);
+
+  // Flush on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current && localNoteRef.current && hasLocalChangesRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        db.notes.update(localNoteRef.current.id, {
+          content: localNoteRef.current.content,
+          updated_at: Date.now(),
+        }).catch(() => {});
+      }
+    };
+  }, []);
 
   const selectedNoteIdRef = useRef(selectedNoteId);
   selectedNoteIdRef.current = selectedNoteId;
@@ -77,6 +153,19 @@ export function RightPanel() {
         finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
       }
 
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      hasLocalChangesRef.current = false;
+
+      const updated = {
+        ...note,
+        content: finalContent,
+        updated_at: Date.now()
+      };
+      setLocalNote(updated);
+
       await db.notes.update(noteId, {
         content: finalContent,
         updated_at: Date.now()
@@ -119,7 +208,7 @@ export function RightPanel() {
     setIsHighlightModalOpen(true);
   };
 
-  const updateBlock = async (index: number, val: any) => {
+  const updateBlock = (index: number, val: any) => {
     if (!localNote || !user) return;
     const tripParsed = parseTripToGoContent(localNote.content);
     const oilParsed = parseOilTravelContent(tripParsed.text);
@@ -142,14 +231,43 @@ export function RightPanel() {
       finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
     }
 
-    await db.notes.update(localNote.id, {
+    const updatedNote = {
+      ...localNote,
       content: finalContent,
       updated_at: Date.now()
-    });
+    };
+
+    // Synchronously update local in-memory state
+    hasLocalChangesRef.current = true;
+    setLocalNote(updatedNote);
+
+    // Debounce database write (300ms)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(async () => {
+      saveTimeoutRef.current = null;
+      try {
+        await db.notes.update(updatedNote.id, {
+          content: updatedNote.content,
+          updated_at: updatedNote.updated_at
+        });
+      } finally {
+        if (!saveTimeoutRef.current) {
+          hasLocalChangesRef.current = false;
+        }
+      }
+    }, 300);
   };
 
   const removeBlock = async (index: number) => {
     if (!localNote || !user) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    hasLocalChangesRef.current = false;
+
     const tripParsed = parseTripToGoContent(localNote.content);
     const oilParsed = parseOilTravelContent(tripParsed.text);
     const noteContent = parseNoteContent(oilParsed.text);
@@ -163,6 +281,13 @@ export function RightPanel() {
       finalContent = serializeTripToGoContent(finalContent, tripParsed.data);
     }
 
+    const updatedNote = {
+      ...localNote,
+      content: finalContent,
+      updated_at: Date.now()
+    };
+    setLocalNote(updatedNote);
+
     await db.notes.update(localNote.id, {
       content: finalContent,
       updated_at: Date.now()
@@ -172,6 +297,12 @@ export function RightPanel() {
   // Explicit block reordering: Move Up / Move Down
   const moveBlock = async (fromIndex: number, toIndex: number) => {
     if (!localNote || fromIndex === toIndex) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    hasLocalChangesRef.current = false;
+
     const currentBlocks = [...noteContent.blocks];
     if (fromIndex < 0 || fromIndex >= currentBlocks.length || toIndex < 0 || toIndex >= currentBlocks.length) return;
 
@@ -185,6 +316,13 @@ export function RightPanel() {
     if (isTripToGoContent(localNote.content)) {
       serialized = serializeTripToGoContent(serialized, tripParsed.data);
     }
+
+    const updatedNote = {
+      ...localNote,
+      content: serialized,
+      updated_at: Date.now()
+    };
+    setLocalNote(updatedNote);
 
     await db.notes.update(localNote.id, {
       content: serialized,
